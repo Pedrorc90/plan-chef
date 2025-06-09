@@ -1,8 +1,7 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../services/firestore_service.dart';
 
@@ -81,16 +80,6 @@ class RecipesScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final user = ref.watch(firebaseUserProvider).asData?.value;
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Recetas'),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.add),
-            onPressed: user == null ? null : () => _addRecipe(context, ref),
-            tooltip: 'Agregar receta',
-          ),
-        ],
-      ),
       body: StreamBuilder<QuerySnapshot>(
         stream: FirebaseFirestore.instance
             .collection('recipes')
@@ -142,7 +131,7 @@ class RecipesScreen extends ConsumerWidget {
                 onDismissed: (direction) async {
                   await FirebaseFirestore.instance.collection('recipes').doc(doc.id).delete();
                   ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text('Receta eliminada')),
+                    const SnackBar(content: Text('Receta eliminada')),
                   );
                 },
                 child: Card(
@@ -156,6 +145,13 @@ class RecipesScreen extends ConsumerWidget {
           );
         },
       ),
+      floatingActionButton: user == null
+          ? null
+          : FloatingActionButton(
+              onPressed: () => _addRecipe(context, ref),
+              tooltip: 'Agregar receta',
+              child: const Icon(Icons.add),
+            ),
     );
   }
 }

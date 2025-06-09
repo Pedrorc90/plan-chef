@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../models/week_plan.dart';
 import '../services/firestore_service.dart';
 
 class HomeScreen extends ConsumerWidget {

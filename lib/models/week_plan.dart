@@ -4,7 +4,7 @@ import 'day_plan.dart';
 
 class WeekPlan {
   final String? id;
-  final String userId;
+  final String createdBy;
   final int weekNumber;
   final int year;
   final List<DayPlan> days;
@@ -12,7 +12,7 @@ class WeekPlan {
 
   WeekPlan({
     this.id,
-    required this.userId,
+    required this.createdBy,
     required this.weekNumber,
     required this.year,
     required this.days,
@@ -21,7 +21,7 @@ class WeekPlan {
 
   factory WeekPlan.fromJson(Map<String, dynamic> json, {String? id}) => WeekPlan(
         id: id,
-        userId: json['userId'] ?? '',
+        createdBy: json['createdBy'] ?? '',
         weekNumber: json['weekNumber'] ?? 0,
         year: json['year'] ?? 0,
         days: (json['days'] as List<dynamic>? ?? [])
@@ -31,7 +31,7 @@ class WeekPlan {
       );
 
   Map<String, dynamic> toJson() => {
-        'userId': userId,
+        'createdBy': createdBy,
         'weekNumber': weekNumber,
         'year': year,
         'days': days.map((d) => d.toJson()).toList(),

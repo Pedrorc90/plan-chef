@@ -1,11 +1,10 @@
 import 'package:flutter/material.dart';
 
-import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:plan_chef/models/day_plan.dart';
 import 'package:plan_chef/models/week_plan.dart';
+import 'package:plan_chef/widgets/week_plan_creation_dialog.dart';
 
 import '../services/firestore_service.dart';
 
@@ -62,7 +61,7 @@ class _WeekPlanScreenState extends ConsumerState<WeekPlanScreen> {
           children: [
             Expanded(
               child: _weekPlan == null
-                  ? Center(child: Text('No hay plan de semana. Genera uno nuevo.'))
+                  ? const Center(child: Text('No hay plan de semana. Genera uno nuevo.'))
                   : ListView.builder(
                       itemCount: _weekPlan!.days.length,
                       itemBuilder: (context, dayIdx) {
@@ -145,70 +144,11 @@ class _WeekPlanScreenState extends ConsumerState<WeekPlanScreen> {
     final selectedMeals = mealOptions.toSet();
     final result = await showDialog<Map<String, dynamic>>(
       context: context,
-      builder: (context) {
-        int tempDays = selectedDays;
-        final tempMeals = Set<String>.from(selectedMeals);
-        return StatefulBuilder(
-          builder: (context, setState) {
-            return AlertDialog(
-              title: const Text('Nuevo plan de semana'),
-              content: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  const Text('¿Cuántos días?'),
-                  Row(
-                    children: [
-                      Radio<int>(
-                        value: 5,
-                        groupValue: tempDays,
-                        onChanged: (v) => setState(() => tempDays = v ?? 7),
-                      ),
-                      const Text('5 días'),
-                      Radio<int>(
-                        value: 7,
-                        groupValue: tempDays,
-                        onChanged: (v) => setState(() => tempDays = v ?? 7),
-                      ),
-                      const Text('7 días'),
-                    ],
-                  ),
-                  const SizedBox(height: 12),
-                  const Text('¿Qué comidas?'),
-                  ...mealOptions.map((meal) => CheckboxListTile(
-                        title: Text(meal),
-                        value: tempMeals.contains(meal),
-                        onChanged: (checked) {
-                          setState(() {
-                            if (checked == true) {
-                              tempMeals.add(meal);
-                            } else {
-                              tempMeals.remove(meal);
-                            }
-                          });
-                        },
-                      )),
-                ],
-              ),
-              actions: [
-                TextButton(
-                  onPressed: () => Navigator.of(context).pop(),
-                  child: const Text('Cancelar'),
-                ),
-                ElevatedButton(
-                  onPressed: () {
-                    if (tempMeals.isEmpty) return;
-                    Navigator.of(context).pop({
-                      'days': tempDays,
-                      'meals': tempMeals.toList(),
-                    });
-                  },
-                  child: const Text('Aceptar'),
-                ),
-              ],
-            );
-          },
-        );
-      },
+      builder: (context) => WeekPlanCreationDialog(
+        initialDays: selectedDays,
+        initialMeals: selectedMeals,
+        mealOptions: mealOptions,
+      ),
     );
     if (result == null) return;
     final selectedNumDays = result['days'] as int;
@@ -228,7 +168,7 @@ class _WeekPlanScreenState extends ConsumerState<WeekPlanScreen> {
       );
       final newPlan = WeekPlan(
         id: null, // Firestore will assign the ID
-        userId: user.uid,
+        createdBy: user.uid,
         weekNumber: weekNumber,
         year: year,
         days: days,

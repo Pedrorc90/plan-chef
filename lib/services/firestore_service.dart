@@ -1,11 +1,8 @@
-import 'package:flutter/material.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
-
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../models/week_plan.dart';
-import '../services/firestore_service.dart';
+import 'package:plan_chef/models/week_plan.dart';
 
 class FirestoreService {
   FirestoreService._();
@@ -17,12 +14,13 @@ class FirestoreService {
     await _db.collection('weekPlans').add(weekPlan.toJson());
   }
 
-  // Fetch all week plans for a user
-  Stream<List<WeekPlan>> getWeekPlans(String userId) {
+  // Fetch all week plans for a user with pagination support
+  Stream<List<WeekPlan>> getWeekPlans(String createdBy, {int limit = 20}) {
     return _db
         .collection('weekPlans')
-        .where('userId', isEqualTo: userId)
+        .where('createdBy', isEqualTo: createdBy)
         .orderBy('createdAt', descending: true)
+        .limit(limit)
         .snapshots()
         .map((snapshot) =>
             snapshot.docs.map((doc) => WeekPlan.fromJson(doc.data(), id: doc.id)).toList());
@@ -43,13 +41,13 @@ class FirestoreService {
   }
 
   // Fetch the current week plan for a user (by week number and year)
-  Future<WeekPlan?> fetchCurrentWeekPlan(String userId) async {
+  Future<WeekPlan?> fetchCurrentWeekPlan(String createdBy) async {
     final now = DateTime.now();
     final weekNumber = _getWeekNumber(now);
     final year = now.year;
     final query = await _db
         .collection('weekPlans')
-        .where('userId', isEqualTo: userId)
+        .where('createdBy', isEqualTo: createdBy)
         .where('weekNumber', isEqualTo: weekNumber)
         .where('year', isEqualTo: year)
         .limit(1)
@@ -61,9 +59,14 @@ class FirestoreService {
     return null;
   }
 
-  // Fetch all recipes for a user
-  Future<List<Map<String, dynamic>>> fetchRecipes(String userId) async {
-    final query = await _db.collection('recipes').where('userId', isEqualTo: userId).get();
+  // Fetch all recipes for a user with pagination support
+  Future<List<Map<String, dynamic>>> fetchRecipes(String createdBy, {int limit = 20}) async {
+    final query = await _db
+        .collection('recipes')
+        .where('createdBy', isEqualTo: createdBy)
+        .orderBy('createdAt', descending: true)
+        .limit(limit)
+        .get();
     return query.docs
         .map((doc) => {
               'id': doc.id,
@@ -104,7 +107,7 @@ final weekPlansProvider = StreamProvider<List<WeekPlan>>((ref) {
 });
 
 // Provider for recipes for the current user (if needed)
-final recipesProvider = FutureProvider.family<List<Map<String, dynamic>>, String>((ref, userId) {
+final recipesProvider = FutureProvider.family<List<Map<String, dynamic>>, String>((ref, createdBy) {
   final firestoreService = ref.watch(firestoreServiceProvider);
-  return firestoreService.fetchRecipes(userId);
+  return firestoreService.fetchRecipes(createdBy);
 });
