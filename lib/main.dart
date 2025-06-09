@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -11,6 +12,7 @@ import 'package:plan_chef/screens/main_scaffold.dart';
 import 'package:plan_chef/screens/menu_generator_screen.dart';
 import 'package:plan_chef/screens/recipes_screen.dart';
 import 'package:plan_chef/screens/shopping_list_screen.dart';
+import 'package:plan_chef/services/firestore_service.dart';
 
 import '../models/week_plan.dart';
 
@@ -19,14 +21,15 @@ Future<void> main() async {
   await Firebase.initializeApp(
     options: DefaultFirebaseOptions.currentPlatform,
   );
-  runApp(const MyApp());
+  runApp(const ProviderScope(child: MyApp()));
 }
 
-class MyApp extends StatelessWidget {
+class MyApp extends ConsumerWidget {
   const MyApp({super.key});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final userAsync = ref.watch(firebaseUserProvider);
     return MaterialApp(
       debugShowCheckedModeBanner: false,
       title: 'Recetario Inteligente',
@@ -35,17 +38,16 @@ class MyApp extends StatelessWidget {
         colorScheme: ColorScheme.fromSeed(seedColor: Colors.green),
         useMaterial3: true,
       ),
-      home: StreamBuilder<User?>(
-        stream: FirebaseAuth.instance.authStateChanges(),
-        builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Scaffold(body: Center(child: CircularProgressIndicator()));
-          }
-          if (snapshot.hasData) {
+      home: userAsync.when(
+        data: (user) {
+          if (user != null) {
             return const MainScaffold();
+          } else {
+            return const AuthScreen();
           }
-          return const AuthScreen();
         },
+        loading: () => const Scaffold(body: Center(child: CircularProgressIndicator())),
+        error: (e, st) => Scaffold(body: Center(child: Text('Error: $e'))),
       ),
     );
   }

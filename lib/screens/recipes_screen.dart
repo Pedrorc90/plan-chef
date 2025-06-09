@@ -1,13 +1,16 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 
-class RecipesScreen extends StatelessWidget {
+import '../services/firestore_service.dart';
+
+class RecipesScreen extends ConsumerWidget {
   const RecipesScreen({super.key});
 
-  Future<void> _addRecipe(BuildContext context) async {
-    final user = FirebaseAuth.instance.currentUser;
+  Future<void> _addRecipe(BuildContext context, WidgetRef ref) async {
+    final user = ref.read(firebaseUserProvider).asData?.value;
     if (user == null) return;
     final titleController = TextEditingController();
     final ingredientsController = TextEditingController();
@@ -75,15 +78,15 @@ class RecipesScreen extends StatelessWidget {
   }
 
   @override
-  Widget build(BuildContext context) {
-    final user = FirebaseAuth.instance.currentUser;
+  Widget build(BuildContext context, WidgetRef ref) {
+    final user = ref.watch(firebaseUserProvider).asData?.value;
     return Scaffold(
       appBar: AppBar(
         title: const Text('Recetas'),
         actions: [
           IconButton(
             icon: const Icon(Icons.add),
-            onPressed: user == null ? null : () => _addRecipe(context),
+            onPressed: user == null ? null : () => _addRecipe(context, ref),
             tooltip: 'Agregar receta',
           ),
         ],

@@ -1,10 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-class MenuGeneratorScreen extends StatelessWidget {
+class MenuGeneratorScreen extends ConsumerWidget {
   const MenuGeneratorScreen({super.key});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     return Scaffold(
       body: ListView(
         padding: const EdgeInsets.all(16),

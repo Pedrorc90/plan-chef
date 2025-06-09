@@ -2,18 +2,21 @@ import 'package:flutter/material.dart';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../models/week_plan.dart';
+import 'package:plan_chef/models/day_plan.dart';
+import 'package:plan_chef/models/week_plan.dart';
+
 import '../services/firestore_service.dart';
 
-class WeekPlanScreen extends StatefulWidget {
+class WeekPlanScreen extends ConsumerStatefulWidget {
   const WeekPlanScreen({super.key});
 
   @override
-  State<WeekPlanScreen> createState() => _WeekPlanScreenState();
+  ConsumerState<WeekPlanScreen> createState() => _WeekPlanScreenState();
 }
 
-class _WeekPlanScreenState extends State<WeekPlanScreen> {
+class _WeekPlanScreenState extends ConsumerState<WeekPlanScreen> {
   WeekPlan? _weekPlan;
   bool _loading = true;
   String? _error;
@@ -30,16 +33,14 @@ class _WeekPlanScreenState extends State<WeekPlanScreen> {
       _error = null;
     });
     try {
-      final user = FirebaseAuth.instance.currentUser;
+      final user = ref.read(firebaseUserProvider).asData?.value;
       if (user == null) throw Exception('No user');
-      final plan = await FirestoreService().fetchCurrentWeekPlan(user.uid);
+      final plan = await ref.read(firestoreServiceProvider).fetchCurrentWeekPlan(user.uid);
       setState(() {
         _weekPlan = plan;
         _loading = false;
       });
     } catch (e) {
-      print('Error in _fetchWeekPlan:');
-      print(e);
       setState(() {
         _error = e.toString();
         _loading = false;
@@ -55,79 +56,87 @@ class _WeekPlanScreenState extends State<WeekPlanScreen> {
     if (_error != null) {
       return Center(child: Text('Error: \\$_error'));
     }
-    return Column(
+    return Stack(
       children: [
-        Padding(
-          padding: const EdgeInsets.all(8.0),
-          child: ElevatedButton.icon(
-            icon: const Icon(Icons.add),
-            label: const Text('Crear nuevo plan de semana'),
-            onPressed: _createNewWeekPlan,
-          ),
+        Column(
+          children: [
+            Expanded(
+              child: _weekPlan == null
+                  ? Center(child: Text('No hay plan de semana. Genera uno nuevo.'))
+                  : ListView.builder(
+                      itemCount: _weekPlan!.days.length,
+                      itemBuilder: (context, dayIdx) {
+                        final day = _weekPlan!.days[dayIdx];
+                        return Card(
+                          margin: const EdgeInsets.all(8),
+                          child: ExpansionTile(
+                            title: Text('Día ${dayIdx + 1}'),
+                            initiallyExpanded: true,
+                            children: [
+                              ...day.meals.keys.map((mealType) {
+                                final recipeId = day.meals[mealType] ?? '';
+                                return ListTile(
+                                  title: Text(mealType),
+                                  subtitle: FutureBuilder<Map<String, dynamic>?>(
+                                    future: recipeId.isNotEmpty
+                                        ? ref
+                                            .read(firestoreServiceProvider)
+                                            .fetchRecipeById(recipeId)
+                                        : Future.value(null),
+                                    builder: (context, snapshot) {
+                                      if (recipeId.isEmpty) {
+                                        return const Text('Sin asignar');
+                                      }
+                                      if (snapshot.connectionState == ConnectionState.waiting) {
+                                        return const Text('Cargando...');
+                                      }
+                                      if (!snapshot.hasData || snapshot.data == null) {
+                                        return const Text('Receta no encontrada');
+                                      }
+                                      final recipe = snapshot.data!;
+                                      final title = recipe['title'] ?? 'Sin nombre';
+                                      return Text('Receta: $title');
+                                    },
+                                  ),
+                                  trailing: IconButton(
+                                    icon: const Icon(Icons.edit),
+                                    onPressed: () async {
+                                      final selectedRecipeId = await _selectRecipeDialog(mealType);
+                                      if (selectedRecipeId != null) {
+                                        setState(() {
+                                          day.meals[mealType] = selectedRecipeId;
+                                        });
+                                        await ref
+                                            .read(firestoreServiceProvider)
+                                            .updateWeekPlan(_weekPlan!.id!, _weekPlan!);
+                                      }
+                                    },
+                                  ),
+                                );
+                              }).toList(),
+                            ],
+                          ),
+                        );
+                      },
+                    ),
+            ),
+          ],
         ),
-        Expanded(
-          child: _weekPlan == null
-              ? Center(child: Text('No hay plan de semana. Genera uno nuevo.'))
-              : ListView.builder(
-                  itemCount: _weekPlan!.days.length,
-                  itemBuilder: (context, dayIdx) {
-                    final day = _weekPlan!.days[dayIdx];
-                    return Card(
-                      margin: const EdgeInsets.all(8),
-                      child: ExpansionTile(
-                        title: Text('Día ${dayIdx + 1}'),
-                        initiallyExpanded: true,
-                        children: [
-                          ...day.meals.keys.map((mealType) {
-                            final recipeId = day.meals[mealType] ?? '';
-                            return ListTile(
-                              title: Text(mealType),
-                              subtitle: FutureBuilder<Map<String, dynamic>?>(
-                                future: recipeId.isNotEmpty
-                                    ? FirestoreService().fetchRecipeById(recipeId)
-                                    : Future.value(null),
-                                builder: (context, snapshot) {
-                                  if (recipeId.isEmpty) {
-                                    return const Text('Sin asignar');
-                                  }
-                                  if (snapshot.connectionState == ConnectionState.waiting) {
-                                    return const Text('Cargando...');
-                                  }
-                                  if (!snapshot.hasData || snapshot.data == null) {
-                                    return const Text('Receta no encontrada');
-                                  }
-                                  final recipe = snapshot.data!;
-                                  final title = recipe['title'] ?? 'Sin nombre';
-                                  return Text('Receta: $title');
-                                },
-                              ),
-                              trailing: IconButton(
-                                icon: const Icon(Icons.edit),
-                                onPressed: () async {
-                                  final selectedRecipeId = await _selectRecipeDialog(mealType);
-                                  if (selectedRecipeId != null) {
-                                    setState(() {
-                                      day.meals[mealType] = selectedRecipeId;
-                                    });
-                                    await FirestoreService()
-                                        .updateWeekPlan(_weekPlan!.id, _weekPlan!);
-                                  }
-                                },
-                              ),
-                            );
-                          }).toList(),
-                        ],
-                      ),
-                    );
-                  },
-                ),
+        Positioned(
+          bottom: 16,
+          right: 16,
+          child: FloatingActionButton(
+            child: const Icon(Icons.add),
+            onPressed: _createNewWeekPlan,
+            tooltip: 'Crear nuevo plan de semana',
+          ),
         ),
       ],
     );
   }
 
   Future<void> _createNewWeekPlan() async {
-    final user = FirebaseAuth.instance.currentUser;
+    final user = ref.read(firebaseUserProvider).asData?.value;
     if (user == null) return;
 
     // Show modal to select days and meal types
@@ -218,14 +227,14 @@ class _WeekPlanScreenState extends State<WeekPlanScreen> {
         (i) => DayPlan(id: i.toString(), meals: {for (var m in selectedMealTypes) m: ''}),
       );
       final newPlan = WeekPlan(
-        id: '',
+        id: null, // Firestore will assign the ID
         userId: user.uid,
         weekNumber: weekNumber,
         year: year,
         days: days,
         createdAt: now,
       );
-      await FirestoreService().createWeekPlan(newPlan);
+      await ref.read(firestoreServiceProvider).createWeekPlan(newPlan);
       await _fetchWeekPlan();
     } catch (e) {
       print('Error in _createNewWeekPlan:');
@@ -238,10 +247,10 @@ class _WeekPlanScreenState extends State<WeekPlanScreen> {
   }
 
   Future<String?> _selectRecipeDialog(String mealType) async {
-    final user = FirebaseAuth.instance.currentUser;
+    final user = ref.read(firebaseUserProvider).asData?.value;
     if (user == null) return null;
     // Only show recipes that include the selected mealType
-    final recipes = (await FirestoreService().fetchRecipes(user.uid))
+    final recipes = (await ref.read(firestoreServiceProvider).fetchRecipes(user.uid))
         .where((r) => (r['mealTypes'] as List?)?.contains(mealType) ?? false)
         .toList();
     String? selectedRecipeId;

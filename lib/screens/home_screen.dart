@@ -1,37 +1,44 @@
 import 'package:flutter/material.dart';
 
-import 'menu_generator_screen.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-class HomeScreen extends StatelessWidget {
+import '../models/week_plan.dart';
+import '../services/firestore_service.dart';
+
+class HomeScreen extends ConsumerWidget {
   final VoidCallback? onGenerateMenu;
   const HomeScreen({super.key, this.onGenerateMenu});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final weekPlansAsync = ref.watch(weekPlansProvider);
+    final userAsync = ref.watch(firebaseUserProvider);
+    if (userAsync.value == null) {
+      return const Scaffold(body: Center(child: Text('No autenticado')));
+    }
     return Scaffold(
-      body: ListView(
-        padding: const EdgeInsets.all(16),
-        children: [
-          const Text('Menú Semanal Actual',
-              style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
-          const SizedBox(height: 16),
-          ...List.generate(
-              7,
-              (index) => Card(
+      body: weekPlansAsync.when(
+        data: (weekPlans) => weekPlans.isEmpty
+            ? const Center(child: Text('No hay planes de semana.'))
+            : ListView.builder(
+                padding: const EdgeInsets.all(16),
+                itemCount: weekPlans.length,
+                itemBuilder: (context, index) {
+                  final plan = weekPlans[index];
+                  return Card(
                     child: ListTile(
-                      title: Text('Día ${index + 1}'),
-                      subtitle: const Text('Desayuno, Comida, Cena'),
+                      title: Text('Semana ${plan.weekNumber} - ${plan.year}'),
+                      subtitle: Text('Días: ${plan.days.length}'),
+                      trailing: const Icon(Icons.arrow_forward_ios),
+                      onTap: () {
+                        // TODO: Optionally navigate to week plan details
+                      },
                     ),
-                  )),
-          const SizedBox(height: 16),
-          Center(
-            child: ElevatedButton(
-              onPressed: onGenerateMenu,
-              child: const Text('Generar nuevo menú'),
-            ),
-          ),
-          const SizedBox(height: 16),
-        ],
+                  );
+                },
+              ),
+        loading: () => const Center(child: CircularProgressIndicator()),
+        error: (e, st) => Center(child: Text('Error: $e')),
       ),
     );
   }

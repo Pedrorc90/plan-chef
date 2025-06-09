@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -7,11 +8,13 @@ import '../models/week_plan.dart';
 import '../services/firestore_service.dart';
 
 class FirestoreService {
+  FirestoreService._();
+  static final FirestoreService instance = FirestoreService._();
   final FirebaseFirestore _db = FirebaseFirestore.instance;
 
   // Create a new week plan
   Future<void> createWeekPlan(WeekPlan weekPlan) async {
-    await _db.collection('weekPlans').add(weekPlan.toMap());
+    await _db.collection('weekPlans').add(weekPlan.toJson());
   }
 
   // Fetch all week plans for a user
@@ -21,19 +24,20 @@ class FirestoreService {
         .where('userId', isEqualTo: userId)
         .orderBy('createdAt', descending: true)
         .snapshots()
-        .map((snapshot) => snapshot.docs.map((doc) => WeekPlan.fromDoc(doc)).toList());
+        .map((snapshot) =>
+            snapshot.docs.map((doc) => WeekPlan.fromJson(doc.data(), id: doc.id)).toList());
   }
 
   // Update a week plan
   Future<void> updateWeekPlan(String weekPlanId, WeekPlan weekPlan) async {
-    await _db.collection('weekPlans').doc(weekPlanId).update(weekPlan.toMap());
+    await _db.collection('weekPlans').doc(weekPlanId).update(weekPlan.toJson());
   }
 
   // Get a single week plan by ID
   Future<WeekPlan?> getWeekPlanById(String weekPlanId) async {
     final doc = await _db.collection('weekPlans').doc(weekPlanId).get();
     if (doc.exists) {
-      return WeekPlan.fromDoc(doc);
+      return WeekPlan.fromJson(doc.data()!, id: doc.id);
     }
     return null;
   }
@@ -51,14 +55,15 @@ class FirestoreService {
         .limit(1)
         .get();
     if (query.docs.isNotEmpty) {
-      return WeekPlan.fromDoc(query.docs.first);
+      final doc = query.docs.first;
+      return WeekPlan.fromJson(doc.data(), id: doc.id);
     }
     return null;
   }
 
   // Fetch all recipes for a user
   Future<List<Map<String, dynamic>>> fetchRecipes(String userId) async {
-    final query = await _db.collection('recipes').where('createdBy', isEqualTo: userId).get();
+    final query = await _db.collection('recipes').where('userId', isEqualTo: userId).get();
     return query.docs
         .map((doc) => {
               'id': doc.id,
@@ -82,3 +87,24 @@ class FirestoreService {
     return 1 + (daysDifference / 7).floor();
   }
 }
+
+// Provider for FirestoreService singleton
+final firestoreServiceProvider = Provider<FirestoreService>((ref) => FirestoreService.instance);
+
+// Provider for current Firebase user
+final firebaseUserProvider =
+    StreamProvider<User?>((ref) => FirebaseAuth.instance.authStateChanges());
+
+// Provider for week plans for the current user
+final weekPlansProvider = StreamProvider<List<WeekPlan>>((ref) {
+  final user = ref.watch(firebaseUserProvider).asData?.value;
+  if (user == null) return const Stream.empty();
+  final firestoreService = ref.watch(firestoreServiceProvider);
+  return firestoreService.getWeekPlans(user.uid);
+});
+
+// Provider for recipes for the current user (if needed)
+final recipesProvider = FutureProvider.family<List<Map<String, dynamic>>, String>((ref, userId) {
+  final firestoreService = ref.watch(firestoreServiceProvider);
+  return firestoreService.fetchRecipes(userId);
+});
