@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "452842587722",
+    "project_id": "plan-chef",
+    "storage_bucket": "plan-chef.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:452842587722:android:04318d5c31c218e06ac8b3",
+        "android_client_info": {
+          "package_name": "com.example.plan_chef"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDSr37qHy2HZqPhtqc1-PxCMyXb0_f5BNQ"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
