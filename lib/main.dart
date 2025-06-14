@@ -1,12 +1,14 @@
 // Dart models for WeekPlan
 import 'package:flutter/material.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
+
 import 'package:firebase_core/firebase_core.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+
+import 'package:plan_chef/firebase_options.dart';
+import 'package:plan_chef/screens/auth/auth_screen.dart';
+import 'package:plan_chef/screens/main_scaffold.dart';
 
 import '../services/firestore_service.dart';
-import 'package:plan_chef/firebase_options.dart';
-import 'package:plan_chef/screens/auth_screen.dart';
-import 'package:plan_chef/screens/main_scaffold.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();

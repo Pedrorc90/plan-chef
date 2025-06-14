@@ -7,8 +7,7 @@ import 'package:firebase_core/firebase_core.dart' show FirebaseOptions;
 class DefaultFirebaseOptions {
   static FirebaseOptions get currentPlatform {
     if (kIsWeb) {
-      throw UnsupportedError('DefaultFirebaseOptions have not been configured for web - '
-          'please re-run the FlutterFire CLI.');
+      return web;
     }
     switch (defaultTargetPlatform) {
       case TargetPlatform.android:
@@ -21,6 +20,16 @@ class DefaultFirebaseOptions {
         throw UnsupportedError('DefaultFirebaseOptions are not supported for this platform.');
     }
   }
+
+  static const FirebaseOptions web = FirebaseOptions(
+    apiKey: 'AIzaSyDSr37qHy2HZqPhtqc1-PxCMyXb0_f5BNQ',
+    authDomain: 'plan-chef.firebaseapp.com',
+    projectId: 'plan-chef',
+    storageBucket: 'plan-chef.appspot.com',
+    messagingSenderId: '452842587722',
+    appId: '1:452842587722:android:04318d5c31c218e06ac8b3D',
+    //measurementId: 'YOUR_MEASUREMENT_ID', // Optional, for analytics
+  );
 
   static const FirebaseOptions android = FirebaseOptions(
     apiKey: 'AIzaSyDSr37qHy2HZqPhtqc1-PxCMyXb0_f5BNQ',
