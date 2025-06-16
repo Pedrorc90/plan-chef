@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../services/firestore_service.dart';
 import '../../services/household_provider.dart';
+import '../../models/recipe.dart';
 
 class RecipesScreen extends ConsumerWidget {
   const RecipesScreen({super.key});
@@ -109,15 +110,14 @@ class RecipesScreen extends ConsumerWidget {
               if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
                 return const Center(child: Text('No hay recetas aún.'));
               }
-              final recipes = snapshot.data!.docs;
+              final recipes = snapshot.data!.docs.map((doc) => Recipe.fromFirestore(doc)).toList();
               return ListView.builder(
                 padding: const EdgeInsets.all(16),
                 itemCount: recipes.length,
                 itemBuilder: (context, index) {
-                  final doc = recipes[index];
-                  final recipe = doc.data() as Map<String, dynamic>;
+                  final recipe = recipes[index];
                   return Dismissible(
-                    key: Key(doc.id),
+                    key: Key(recipe.id),
                     direction: DismissDirection.endToStart,
                     background: Container(
                       color: Colors.red,
@@ -145,15 +145,18 @@ class RecipesScreen extends ConsumerWidget {
                       );
                     },
                     onDismissed: (direction) async {
-                      await FirebaseFirestore.instance.collection('recipes').doc(doc.id).delete();
+                      await FirebaseFirestore.instance
+                          .collection('recipes')
+                          .doc(recipe.id)
+                          .delete();
                       ScaffoldMessenger.of(context).showSnackBar(
                         const SnackBar(content: Text('Receta eliminada')),
                       );
                     },
                     child: Card(
                       child: ListTile(
-                        title: Text(recipe['title'] ?? ''),
-                        subtitle: Text((recipe['ingredients'] as List<dynamic>?)?.join(', ') ?? ''),
+                        title: Text(recipe.title),
+                        subtitle: Text(recipe.ingredients.join(', ')),
                       ),
                     ),
                   );

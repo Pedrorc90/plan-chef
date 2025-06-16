@@ -3,6 +3,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:plan_chef/models/week_plan.dart';
+
 import 'household_provider.dart';
 
 class FirestoreService {
@@ -56,13 +57,13 @@ class FirestoreService {
   }
 
   // Fetch the current week plan for a user (by week number and year)
-  Future<WeekPlan?> fetchCurrentWeekPlan(String createdBy) async {
+  Future<WeekPlan?> fetchCurrentWeekPlan(String householdId) async {
     final now = DateTime.now();
     final weekNumber = _getWeekNumber(now);
     final year = now.year;
     final query = await _db
         .collection('weekPlans')
-        .where('createdBy', isEqualTo: createdBy)
+        .where('householdId', isEqualTo: householdId)
         .where('weekNumber', isEqualTo: weekNumber)
         .where('year', isEqualTo: year)
         .limit(1)
@@ -75,10 +76,10 @@ class FirestoreService {
   }
 
   // Fetch all recipes for a user with pagination support
-  Future<List<Map<String, dynamic>>> fetchRecipes(String createdBy, {int limit = 20}) async {
+  Future<List<Map<String, dynamic>>> fetchRecipes(String householdId, {int limit = 20}) async {
     final query = await _db
         .collection('recipes')
-        .where('createdBy', isEqualTo: createdBy)
+        .where('householdId', isEqualTo: householdId)
         .orderBy('createdAt', descending: true)
         .limit(limit)
         .get();

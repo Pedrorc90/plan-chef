@@ -1,12 +1,15 @@
 import 'package:flutter/material.dart';
 
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:plan_chef/models/day_plan.dart';
 import 'package:plan_chef/models/week_plan.dart';
 import 'package:plan_chef/widgets/week_plan_creation_dialog.dart';
 
+import '../../models/recipe.dart';
 import '../../services/firestore_service.dart';
+import '../../services/household_provider.dart';
 
 class WeekPlanScreen extends ConsumerStatefulWidget {
   final String weekPlanId;
@@ -57,6 +60,45 @@ class _WeekPlanScreenState extends ConsumerState<WeekPlanScreen> {
           icon: const Icon(Icons.arrow_back),
           onPressed: () => Navigator.of(context).pop(),
         ),
+        actions: [
+          // TEMP: Migration button for admin/dev use
+          Consumer(
+            builder: (context, ref, _) {
+              final user = ref.watch(firebaseUserProvider).asData?.value;
+              final householdIdAsync = ref.watch(householdIdProvider);
+              return householdIdAsync.when(
+                data: (householdId) => IconButton(
+                  icon: const Icon(Icons.sync),
+                  tooltip: 'Migrar weekPlans',
+                  onPressed: user == null || householdId == null
+                      ? null
+                      : () async {
+                          final batch = FirebaseFirestore.instance.batch();
+                          final query = await FirebaseFirestore.instance
+                              .collection('weekPlans')
+                              .where('createdBy', isEqualTo: user.uid)
+                              .get();
+                          int updated = 0;
+                          for (var doc in query.docs) {
+                            if ((doc.data()['householdId'] ?? '').isEmpty) {
+                              batch.update(doc.reference, {'householdId': householdId});
+                              updated++;
+                            }
+                          }
+                          if (updated > 0) {
+                            await batch.commit();
+                          }
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(content: Text('WeekPlans migrados: $updated')),
+                          );
+                        },
+                ),
+                loading: () => const SizedBox.shrink(),
+                error: (e, st) => const SizedBox.shrink(),
+              );
+            },
+          ),
+        ],
       ),
       body: _loading
           ? const Center(child: CircularProgressIndicator())
@@ -81,11 +123,9 @@ class _WeekPlanScreenState extends ConsumerState<WeekPlanScreen> {
                                       final recipeId = day.meals[mealType] ?? '';
                                       return ListTile(
                                         title: Text(mealType),
-                                        subtitle: FutureBuilder<Map<String, dynamic>?>(
+                                        subtitle: FutureBuilder<Recipe?>(
                                           future: recipeId.isNotEmpty
-                                              ? ref
-                                                  .read(firestoreServiceProvider)
-                                                  .fetchRecipeById(recipeId)
+                                              ? _fetchRecipe(recipeId)
                                               : Future.value(null),
                                           builder: (context, snapshot) {
                                             if (recipeId.isEmpty) {
@@ -99,7 +139,7 @@ class _WeekPlanScreenState extends ConsumerState<WeekPlanScreen> {
                                               return const Text('Receta no encontrada');
                                             }
                                             final recipe = snapshot.data!;
-                                            final title = recipe['title'] ?? 'Sin nombre';
+                                            final title = recipe.title;
                                             return Text('Receta: $title');
                                           },
                                         ),
@@ -131,12 +171,10 @@ class _WeekPlanScreenState extends ConsumerState<WeekPlanScreen> {
     );
   }
 
-  // Placeholder: Replace with your actual householdId provider or logic
-  String get householdId => 'PLACEHOLDER_HOUSEHOLD_ID';
-
   Future<void> _createNewWeekPlan() async {
     final user = ref.read(firebaseUserProvider).asData?.value;
-    if (user == null) return;
+    final householdId = await ref.read(householdIdProvider.future);
+    if (user == null || householdId == null) return;
 
     // Show modal to select days and meal types
     int selectedDays = 7;
@@ -168,7 +206,7 @@ class _WeekPlanScreenState extends ConsumerState<WeekPlanScreen> {
       );
       final newPlan = WeekPlan(
         id: null, // Firestore will assign the ID
-        householdId: householdId, // <-- use householdId here
+        householdId: householdId, // use real householdId
         createdBy: user.uid,
         weekNumber: weekNumber,
         year: year,
@@ -188,11 +226,16 @@ class _WeekPlanScreenState extends ConsumerState<WeekPlanScreen> {
   }
 
   Future<String?> _selectRecipeDialog(String mealType) async {
-    final user = ref.read(firebaseUserProvider).asData?.value;
-    if (user == null) return null;
+    final householdId = await ref.read(householdIdProvider.future);
+    if (householdId == null) return null;
     // Only show recipes that include the selected mealType
-    final recipes = (await ref.read(firestoreServiceProvider).fetchRecipes(user.uid))
-        .where((r) => (r['mealTypes'] as List?)?.contains(mealType) ?? false)
+    final recipes = (await FirebaseFirestore.instance
+            .collection('recipes')
+            .where('householdId', isEqualTo: householdId)
+            .get())
+        .docs
+        .map((doc) => Recipe.fromFirestore(doc))
+        .where((r) => r.mealTypes.contains(mealType))
         .toList();
     String? selectedRecipeId;
     return showDialog<String>(
@@ -210,8 +253,8 @@ class _WeekPlanScreenState extends ConsumerState<WeekPlanScreen> {
                     itemBuilder: (context, idx) {
                       final recipe = recipes[idx];
                       return RadioListTile<String>(
-                        title: Text(recipe['title'] ?? 'Sin nombre'),
-                        value: recipe['id'],
+                        title: Text(recipe.title),
+                        value: recipe.id,
                         groupValue: selectedRecipeId,
                         onChanged: (val) {
                           selectedRecipeId = val;
@@ -230,6 +273,12 @@ class _WeekPlanScreenState extends ConsumerState<WeekPlanScreen> {
         );
       },
     );
+  }
+
+  Future<Recipe?> _fetchRecipe(String recipeId) async {
+    final doc = await FirebaseFirestore.instance.collection('recipes').doc(recipeId).get();
+    if (!doc.exists) return null;
+    return Recipe.fromFirestore(doc);
   }
 
   int _getWeekNumber(DateTime date) {
