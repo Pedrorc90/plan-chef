@@ -14,6 +14,9 @@ class HomeScreen extends ConsumerWidget {
   final VoidCallback? onGenerateMenu;
   const HomeScreen({super.key, this.onGenerateMenu});
 
+  // Placeholder: Replace with your actual householdId provider or logic
+  String get householdId => 'PLACEHOLDER_HOUSEHOLD_ID';
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final weekPlansAsync = ref.watch(weekPlansProvider);
@@ -76,6 +79,7 @@ class HomeScreen extends ConsumerWidget {
           );
           final newPlan = WeekPlan(
             id: null,
+            householdId: householdId,
             createdBy: user.uid,
             weekNumber: weekNumber,
             year: year,

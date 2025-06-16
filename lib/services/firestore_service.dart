@@ -3,11 +3,14 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:plan_chef/models/week_plan.dart';
+import 'household_provider.dart';
 
 class FirestoreService {
   FirestoreService._();
   static final FirestoreService instance = FirestoreService._();
   final FirebaseFirestore _db = FirebaseFirestore.instance;
+
+  FirebaseFirestore get db => _db;
 
   // Create a new week plan
   Future<void> createWeekPlan(WeekPlan weekPlan) async {
@@ -19,6 +22,18 @@ class FirestoreService {
     return _db
         .collection('weekPlans')
         .where('createdBy', isEqualTo: createdBy)
+        .orderBy('createdAt', descending: true)
+        .limit(limit)
+        .snapshots()
+        .map((snapshot) =>
+            snapshot.docs.map((doc) => WeekPlan.fromJson(doc.data(), id: doc.id)).toList());
+  }
+
+  // Fetch all week plans for a household with pagination support
+  Stream<List<WeekPlan>> getWeekPlansByHousehold(String householdId, {int limit = 20}) {
+    return _db
+        .collection('weekPlans')
+        .where('householdId', isEqualTo: householdId)
         .orderBy('createdAt', descending: true)
         .limit(limit)
         .snapshots()
@@ -98,12 +113,18 @@ final firestoreServiceProvider = Provider<FirestoreService>((ref) => FirestoreSe
 final firebaseUserProvider =
     StreamProvider<User?>((ref) => FirebaseAuth.instance.authStateChanges());
 
-// Provider for week plans for the current user
+// Provider for week plans for the current household
 final weekPlansProvider = StreamProvider<List<WeekPlan>>((ref) {
-  final user = ref.watch(firebaseUserProvider).asData?.value;
-  if (user == null) return const Stream.empty();
-  final firestoreService = ref.watch(firestoreServiceProvider);
-  return firestoreService.getWeekPlans(user.uid);
+  final householdIdAsync = ref.watch(householdIdProvider);
+  return householdIdAsync.when(
+    data: (householdId) {
+      if (householdId == null) return const Stream.empty();
+      final firestoreService = ref.watch(firestoreServiceProvider);
+      return firestoreService.getWeekPlansByHousehold(householdId);
+    },
+    loading: () => const Stream.empty(),
+    error: (_, __) => const Stream.empty(),
+  );
 });
 
 // Provider for recipes for the current user (if needed)

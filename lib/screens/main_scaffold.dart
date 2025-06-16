@@ -49,7 +49,7 @@ class _MainScaffoldState extends ConsumerState<MainScaffold> {
         body: [
           HomeScreen(),
           const RecipesScreen(),
-          const MenuGeneratorScreen(),
+          //const MenuGeneratorScreen(),
           const ShoppingListScreen(),
           const ProfileScreen(),
         ][_selectedIndex],
@@ -60,7 +60,7 @@ class _MainScaffoldState extends ConsumerState<MainScaffold> {
           items: const [
             BottomNavigationBarItem(icon: Icon(Icons.home), label: 'Inicio'),
             BottomNavigationBarItem(icon: Icon(Icons.menu_book), label: 'Recetas'),
-            BottomNavigationBarItem(icon: Icon(Icons.auto_awesome), label: 'Menú'),
+            //BottomNavigationBarItem(icon: Icon(Icons.auto_awesome), label: 'Menú'),
             BottomNavigationBarItem(icon: Icon(Icons.shopping_cart), label: 'Compras'),
             BottomNavigationBarItem(icon: Icon(Icons.person), label: 'Perfil'),
           ],

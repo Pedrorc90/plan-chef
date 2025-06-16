@@ -131,6 +131,9 @@ class _WeekPlanScreenState extends ConsumerState<WeekPlanScreen> {
     );
   }
 
+  // Placeholder: Replace with your actual householdId provider or logic
+  String get householdId => 'PLACEHOLDER_HOUSEHOLD_ID';
+
   Future<void> _createNewWeekPlan() async {
     final user = ref.read(firebaseUserProvider).asData?.value;
     if (user == null) return;
@@ -165,6 +168,7 @@ class _WeekPlanScreenState extends ConsumerState<WeekPlanScreen> {
       );
       final newPlan = WeekPlan(
         id: null, // Firestore will assign the ID
+        householdId: householdId, // <-- use householdId here
         createdBy: user.uid,
         weekNumber: weekNumber,
         year: year,

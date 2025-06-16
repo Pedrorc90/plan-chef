@@ -4,6 +4,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../services/firestore_service.dart';
+import '../../services/household_provider.dart';
 
 class RecipesScreen extends ConsumerWidget {
   const RecipesScreen({super.key});
@@ -11,6 +12,14 @@ class RecipesScreen extends ConsumerWidget {
   Future<void> _addRecipe(BuildContext context, WidgetRef ref) async {
     final user = ref.read(firebaseUserProvider).asData?.value;
     if (user == null) return;
+    // Get householdId from provider
+    final householdId = await ref.read(householdIdProvider.future);
+    if (householdId == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('No tienes un hogar vinculado.')),
+      );
+      return;
+    }
     final titleController = TextEditingController();
     final ingredientsController = TextEditingController();
     final mealTypes = ['Desayuno', 'Comida', 'Merienda', 'Cena'];
@@ -63,6 +72,7 @@ class RecipesScreen extends ConsumerWidget {
                   'title': title,
                   'ingredients': ingredients,
                   'createdBy': user.uid,
+                  'householdId': householdId,
                   'createdAt': FieldValue.serverTimestamp(),
                   'mealTypes': selectedMealTypes.toList(),
                 });
@@ -79,71 +89,81 @@ class RecipesScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final user = ref.watch(firebaseUserProvider).asData?.value;
+    final householdIdAsync = ref.watch(householdIdProvider);
     return Scaffold(
-      body: StreamBuilder<QuerySnapshot>(
-        stream: FirebaseFirestore.instance
-            .collection('recipes')
-            .where('createdBy', isEqualTo: user?.uid)
-            .orderBy('createdAt', descending: true)
-            .snapshots(),
-        builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Center(child: CircularProgressIndicator());
+      body: householdIdAsync.when(
+        data: (householdId) {
+          if (householdId == null) {
+            return const Center(child: Text('No tienes un hogar vinculado.'));
           }
-          if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
-            return const Center(child: Text('No hay recetas aún.'));
-          }
-          final recipes = snapshot.data!.docs;
-          return ListView.builder(
-            padding: const EdgeInsets.all(16),
-            itemCount: recipes.length,
-            itemBuilder: (context, index) {
-              final doc = recipes[index];
-              final recipe = doc.data() as Map<String, dynamic>;
-              return Dismissible(
-                key: Key(doc.id),
-                direction: DismissDirection.endToStart,
-                background: Container(
-                  color: Colors.red,
-                  alignment: Alignment.centerRight,
-                  padding: const EdgeInsets.symmetric(horizontal: 20),
-                  child: const Icon(Icons.delete, color: Colors.white),
-                ),
-                confirmDismiss: (direction) async {
-                  return await showDialog(
-                    context: context,
-                    builder: (context) => AlertDialog(
-                      title: const Text('Eliminar receta'),
-                      content: const Text('¿Estás seguro de que deseas eliminar esta receta?'),
-                      actions: [
-                        TextButton(
-                          onPressed: () => Navigator.of(context).pop(false),
-                          child: const Text('Cancelar'),
+          return StreamBuilder<QuerySnapshot>(
+            stream: FirebaseFirestore.instance
+                .collection('recipes')
+                .where('householdId', isEqualTo: householdId)
+                .orderBy('createdAt', descending: true)
+                .snapshots(),
+            builder: (context, snapshot) {
+              if (snapshot.connectionState == ConnectionState.waiting) {
+                return const Center(child: CircularProgressIndicator());
+              }
+              if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
+                return const Center(child: Text('No hay recetas aún.'));
+              }
+              final recipes = snapshot.data!.docs;
+              return ListView.builder(
+                padding: const EdgeInsets.all(16),
+                itemCount: recipes.length,
+                itemBuilder: (context, index) {
+                  final doc = recipes[index];
+                  final recipe = doc.data() as Map<String, dynamic>;
+                  return Dismissible(
+                    key: Key(doc.id),
+                    direction: DismissDirection.endToStart,
+                    background: Container(
+                      color: Colors.red,
+                      alignment: Alignment.centerRight,
+                      padding: const EdgeInsets.symmetric(horizontal: 20),
+                      child: const Icon(Icons.delete, color: Colors.white),
+                    ),
+                    confirmDismiss: (direction) async {
+                      return await showDialog(
+                        context: context,
+                        builder: (context) => AlertDialog(
+                          title: const Text('Eliminar receta'),
+                          content: const Text('¿Estás seguro de que deseas eliminar esta receta?'),
+                          actions: [
+                            TextButton(
+                              onPressed: () => Navigator.of(context).pop(false),
+                              child: const Text('Cancelar'),
+                            ),
+                            TextButton(
+                              onPressed: () => Navigator.of(context).pop(true),
+                              child: const Text('Eliminar'),
+                            ),
+                          ],
                         ),
-                        TextButton(
-                          onPressed: () => Navigator.of(context).pop(true),
-                          child: const Text('Eliminar'),
-                        ),
-                      ],
+                      );
+                    },
+                    onDismissed: (direction) async {
+                      await FirebaseFirestore.instance.collection('recipes').doc(doc.id).delete();
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('Receta eliminada')),
+                      );
+                    },
+                    child: Card(
+                      child: ListTile(
+                        title: Text(recipe['title'] ?? ''),
+                        subtitle: Text((recipe['ingredients'] as List<dynamic>?)?.join(', ') ?? ''),
+                      ),
                     ),
                   );
                 },
-                onDismissed: (direction) async {
-                  await FirebaseFirestore.instance.collection('recipes').doc(doc.id).delete();
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Receta eliminada')),
-                  );
-                },
-                child: Card(
-                  child: ListTile(
-                    title: Text(recipe['title'] ?? ''),
-                    subtitle: Text((recipe['ingredients'] as List<dynamic>?)?.join(', ') ?? ''),
-                  ),
-                ),
               );
             },
           );
         },
+        loading: () => const Center(child: CircularProgressIndicator()),
+        error: (e, st) => Center(child: Text('Error: $e')),
       ),
       floatingActionButton: user == null
           ? null

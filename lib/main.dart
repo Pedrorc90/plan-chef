@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 
 import 'package:plan_chef/firebase_options.dart';
 import 'package:plan_chef/screens/auth/auth_screen.dart';
@@ -24,6 +25,16 @@ class MyApp extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final userAsync = ref.watch(firebaseUserProvider);
+    userAsync.whenData((user) async {
+      if (user != null) {
+        // Sync user to Firestore users collection
+        final usersRef = FirebaseFirestore.instance.collection('users');
+        await usersRef.doc(user.uid).set({
+          'email': user.email,
+          'uid': user.uid,
+        }, SetOptions(merge: true));
+      }
+    });
     return MaterialApp(
       debugShowCheckedModeBanner: false,
       title: 'Recetario Inteligente',
