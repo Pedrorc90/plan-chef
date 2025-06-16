@@ -252,14 +252,29 @@ class _WeekPlanScreenState extends ConsumerState<WeekPlanScreen> {
                     itemCount: recipes.length,
                     itemBuilder: (context, idx) {
                       final recipe = recipes[idx];
-                      return RadioListTile<String>(
-                        title: Text(recipe.title),
-                        value: recipe.id,
-                        groupValue: selectedRecipeId,
-                        onChanged: (val) {
-                          selectedRecipeId = val;
-                          Navigator.of(context).pop(val);
-                        },
+                      return Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Padding(
+                            padding: const EdgeInsets.only(left: 8, right: 8, top: 8, bottom: 2),
+                            child: Text(
+                              recipe.mealTypes.join(', '),
+                              style: const TextStyle(
+                                fontWeight: FontWeight.bold,
+                                color: Colors.green,
+                              ),
+                            ),
+                          ),
+                          RadioListTile<String>(
+                            title: Text(recipe.title),
+                            value: recipe.id,
+                            groupValue: selectedRecipeId,
+                            onChanged: (val) {
+                              selectedRecipeId = val;
+                              Navigator.of(context).pop(val);
+                            },
+                          ),
+                        ],
                       );
                     },
                   ),

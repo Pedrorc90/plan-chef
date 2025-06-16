@@ -3,9 +3,9 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../models/recipe.dart';
 import '../../services/firestore_service.dart';
 import '../../services/household_provider.dart';
-import '../../models/recipe.dart';
 
 class RecipesScreen extends ConsumerWidget {
   const RecipesScreen({super.key});
@@ -87,6 +87,21 @@ class RecipesScreen extends ConsumerWidget {
     );
   }
 
+  Color _mealTypeColor(String mealType) {
+    switch (mealType) {
+      case 'Desayuno':
+        return Colors.orange.shade200;
+      case 'Comida':
+        return Colors.green.shade200;
+      case 'Merienda':
+        return Colors.blue.shade200;
+      case 'Cena':
+        return Colors.purple.shade200;
+      default:
+        return Colors.grey.shade300;
+    }
+  }
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final user = ref.watch(firebaseUserProvider).asData?.value;
@@ -155,7 +170,34 @@ class RecipesScreen extends ConsumerWidget {
                     },
                     child: Card(
                       child: ListTile(
-                        title: Text(recipe.title),
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                        title: Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Expanded(child: Text(recipe.title)),
+                            Row(
+                              children: recipe.mealTypes
+                                  .map((type) => Container(
+                                        margin: const EdgeInsets.only(left: 4),
+                                        padding:
+                                            const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                        decoration: BoxDecoration(
+                                          color: _mealTypeColor(type),
+                                          borderRadius: BorderRadius.circular(12),
+                                        ),
+                                        child: Text(
+                                          type,
+                                          style: const TextStyle(
+                                            fontWeight: FontWeight.bold,
+                                            color: Colors.black87,
+                                            fontSize: 12,
+                                          ),
+                                        ),
+                                      ))
+                                  .toList(),
+                            ),
+                          ],
+                        ),
                         subtitle: Text(recipe.ingredients.join(', ')),
                       ),
                     ),
