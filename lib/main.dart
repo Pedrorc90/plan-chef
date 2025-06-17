@@ -1,9 +1,9 @@
 // Dart models for WeekPlan
 import 'package:flutter/material.dart';
 
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
 
 import 'package:plan_chef/firebase_options.dart';
 import 'package:plan_chef/screens/auth/auth_screen.dart';
@@ -37,7 +37,7 @@ class MyApp extends ConsumerWidget {
     });
     return MaterialApp(
       debugShowCheckedModeBanner: false,
-      title: 'Recetario Inteligente',
+      title: 'Plan Chef',
       theme: ThemeData(
         brightness: Brightness.light,
         colorScheme: ColorScheme.fromSeed(seedColor: Colors.green),

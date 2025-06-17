@@ -10,10 +10,9 @@ import '../../services/household_provider.dart';
 class RecipesScreen extends ConsumerWidget {
   const RecipesScreen({super.key});
 
-  Future<void> _addRecipe(BuildContext context, WidgetRef ref) async {
+  Future<void> _showRecipeDialog(BuildContext context, WidgetRef ref, {Recipe? recipe}) async {
     final user = ref.read(firebaseUserProvider).asData?.value;
     if (user == null) return;
-    // Get householdId from provider
     final householdId = await ref.read(householdIdProvider.future);
     if (householdId == null) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -21,14 +20,15 @@ class RecipesScreen extends ConsumerWidget {
       );
       return;
     }
-    final titleController = TextEditingController();
-    final ingredientsController = TextEditingController();
+    final titleController = TextEditingController(text: recipe?.title ?? '');
+    final ingredientsController = TextEditingController(text: recipe?.ingredients.join(', ') ?? '');
+    final commentsController = TextEditingController(text: recipe?.comments.join('\n') ?? '');
     final mealTypes = ['Desayuno', 'Comida', 'Merienda', 'Cena'];
-    final selectedMealTypes = <String>{};
+    final selectedMealTypes = <String>{...?(recipe?.mealTypes)};
     await showDialog(
       context: context,
       builder: (dialogContext) => AlertDialog(
-        title: const Text('Agregar receta'),
+        title: Text(recipe == null ? 'Agregar receta' : 'Editar receta'),
         content: SingleChildScrollView(
           child: Column(
             mainAxisSize: MainAxisSize.min,
@@ -37,24 +37,38 @@ class RecipesScreen extends ConsumerWidget {
                 controller: titleController,
                 decoration: const InputDecoration(labelText: 'Título'),
               ),
+              const SizedBox(height: 16),
               TextField(
                 controller: ingredientsController,
                 decoration: const InputDecoration(labelText: 'Ingredientes (separados por coma)'),
               ),
               const SizedBox(height: 16),
               const Text('Tipo de receta:'),
-              ...mealTypes.map((type) => CheckboxListTile(
-                    title: Text(type),
-                    value: selectedMealTypes.contains(type),
-                    onChanged: (checked) {
-                      (dialogContext as Element).markNeedsBuild();
-                      if (checked == true) {
-                        selectedMealTypes.add(type);
-                      } else {
-                        selectedMealTypes.remove(type);
-                      }
-                    },
+              ...mealTypes.map((type) => StatefulBuilder(
+                    builder: (context, setState) => CheckboxListTile(
+                      title: Text(type),
+                      value: selectedMealTypes.contains(type),
+                      onChanged: (checked) {
+                        setState(() {
+                          if (checked == true) {
+                            selectedMealTypes.add(type);
+                          } else {
+                            selectedMealTypes.remove(type);
+                          }
+                        });
+                      },
+                    ),
                   )),
+              const SizedBox(height: 16),
+              TextField(
+                controller: commentsController,
+                decoration: const InputDecoration(
+                  labelText: 'Comentarios (uno por línea)',
+                  alignLabelWithHint: true,
+                ),
+                minLines: 2,
+                maxLines: 5,
+              ),
             ],
           ),
         ),
@@ -68,15 +82,32 @@ class RecipesScreen extends ConsumerWidget {
               final title = titleController.text.trim();
               final ingredients =
                   ingredientsController.text.split(',').map((e) => e.trim()).toList();
+              final comments = commentsController.text.trim().isEmpty
+                  ? <String>[]
+                  : commentsController.text
+                      .split('\n')
+                      .map((e) => e.trim())
+                      .where((e) => e.isNotEmpty)
+                      .toList();
               if (title.isNotEmpty && selectedMealTypes.isNotEmpty) {
-                await FirebaseFirestore.instance.collection('recipes').add({
-                  'title': title,
-                  'ingredients': ingredients,
-                  'createdBy': user.uid,
-                  'householdId': householdId,
-                  'createdAt': FieldValue.serverTimestamp(),
-                  'mealTypes': selectedMealTypes.toList(),
-                });
+                if (recipe == null) {
+                  await FirebaseFirestore.instance.collection('recipes').add({
+                    'title': title,
+                    'ingredients': ingredients,
+                    'createdBy': user.uid,
+                    'householdId': householdId,
+                    'createdAt': FieldValue.serverTimestamp(),
+                    'mealTypes': selectedMealTypes.toList(),
+                    'comments': comments,
+                  });
+                } else {
+                  await FirebaseFirestore.instance.collection('recipes').doc(recipe.id).update({
+                    'title': title,
+                    'ingredients': ingredients,
+                    'mealTypes': selectedMealTypes.toList(),
+                    'comments': comments,
+                  });
+                }
                 Navigator.pop(dialogContext);
               }
             },
@@ -85,21 +116,6 @@ class RecipesScreen extends ConsumerWidget {
         ],
       ),
     );
-  }
-
-  Color _mealTypeColor(String mealType) {
-    switch (mealType) {
-      case 'Desayuno':
-        return Colors.orange.shade200;
-      case 'Comida':
-        return Colors.green.shade200;
-      case 'Merienda':
-        return Colors.blue.shade200;
-      case 'Cena':
-        return Colors.purple.shade200;
-      default:
-        return Colors.grey.shade300;
-    }
   }
 
   @override
@@ -137,7 +153,7 @@ class RecipesScreen extends ConsumerWidget {
                     background: Container(
                       color: Colors.red,
                       alignment: Alignment.centerRight,
-                      padding: const EdgeInsets.symmetric(horizontal: 20),
+                      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
                       child: const Icon(Icons.delete, color: Colors.white),
                     ),
                     confirmDismiss: (direction) async {
@@ -168,39 +184,9 @@ class RecipesScreen extends ConsumerWidget {
                         const SnackBar(content: Text('Receta eliminada')),
                       );
                     },
-                    child: Card(
-                      child: ListTile(
-                        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                        title: Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            Expanded(child: Text(recipe.title)),
-                            Row(
-                              children: recipe.mealTypes
-                                  .map((type) => Container(
-                                        margin: const EdgeInsets.only(left: 4),
-                                        padding:
-                                            const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                                        decoration: BoxDecoration(
-                                          color: _mealTypeColor(type),
-                                          borderRadius: BorderRadius.circular(12),
-                                        ),
-                                        child: Text(
-                                          type,
-                                          style: const TextStyle(
-                                            fontWeight: FontWeight.bold,
-                                            color: Colors.black87,
-                                            fontSize: 12,
-                                          ),
-                                        ),
-                                      ))
-                                  .toList(),
-                            ),
-                          ],
-                        ),
-                        subtitle: Text(recipe.ingredients.join(', ')),
-                      ),
-                    ),
+                    child: _RecipeCardWithComments(
+                        recipe: recipe,
+                        onEdit: () => _showRecipeDialog(context, ref, recipe: recipe)),
                   );
                 },
               );
@@ -213,10 +199,150 @@ class RecipesScreen extends ConsumerWidget {
       floatingActionButton: user == null
           ? null
           : FloatingActionButton(
-              onPressed: () => _addRecipe(context, ref),
+              onPressed: () => _showRecipeDialog(context, ref),
               tooltip: 'Agregar receta',
               child: const Icon(Icons.add),
             ),
     );
+  }
+}
+
+class _RecipeCardWithComments extends StatefulWidget {
+  final Recipe recipe;
+  final VoidCallback onEdit;
+
+  const _RecipeCardWithComments({
+    Key? key,
+    required this.recipe,
+    required this.onEdit,
+  }) : super(key: key);
+
+  @override
+  __RecipeCardWithCommentsState createState() => __RecipeCardWithCommentsState();
+}
+
+class __RecipeCardWithCommentsState extends State<_RecipeCardWithComments> {
+  bool _expanded = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final recipe = widget.recipe;
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Expanded(
+                  child: Stack(
+                    children: [
+                      InkWell(
+                        borderRadius: BorderRadius.circular(4),
+                        onTap: widget.onEdit,
+                        child: Padding(
+                          padding: const EdgeInsets.only(right: 36), // space for the icon
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                children: [
+                                  Expanded(
+                                    flex: 6,
+                                    child: Text(
+                                      recipe.title,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 8),
+                              Wrap(
+                                spacing: 4,
+                                runSpacing: 4,
+                                children: [
+                                  ...recipe.mealTypes.map((type) => Container(
+                                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                        decoration: BoxDecoration(
+                                          color: _mealTypeColor(type),
+                                          borderRadius: BorderRadius.circular(12),
+                                        ),
+                                        child: Text(
+                                          type,
+                                          style: const TextStyle(
+                                            fontWeight: FontWeight.bold,
+                                            color: Colors.black87,
+                                            fontSize: 12,
+                                          ),
+                                        ),
+                                      )),
+                                ],
+                              ),
+                              const SizedBox(height: 8),
+                              Text(
+                                recipe.ingredients.join(', '),
+                                style: const TextStyle(color: Colors.black54),
+                              ),
+                              const SizedBox(height: 8),
+                            ],
+                          ),
+                        ),
+                      ),
+                      if (recipe.comments.isNotEmpty)
+                        Positioned(
+                          right: 0,
+                          bottom: 0,
+                          child: IconButton(
+                            icon: Icon(_expanded ? Icons.comment : Icons.comment_outlined,
+                                color: Colors.blueGrey, size: 22),
+                            onPressed: () => setState(() => _expanded = !_expanded),
+                            tooltip: 'Ver comentarios',
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            if (_expanded)
+              recipe.comments.isEmpty
+                  ? const Padding(
+                      padding: EdgeInsets.symmetric(vertical: 8),
+                      child: Text('Sin comentarios'),
+                    )
+                  : Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 8),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text('Comentarios:', style: TextStyle(fontWeight: FontWeight.bold)),
+                          const SizedBox(height: 4),
+                          ...recipe.comments.map((c) => Padding(
+                                padding: const EdgeInsets.only(bottom: 4),
+                                child: Text('- $c'),
+                              )),
+                        ],
+                      ),
+                    ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Color _mealTypeColor(String mealType) {
+    switch (mealType) {
+      case 'Desayuno':
+        return Colors.orange.shade200;
+      case 'Comida':
+        return Colors.green.shade200;
+      case 'Merienda':
+        return Colors.blue.shade200;
+      case 'Cena':
+        return Colors.purple.shade200;
+      default:
+        return Colors.grey.shade300;
+    }
   }
 }

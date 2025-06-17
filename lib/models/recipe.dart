@@ -1,3 +1,5 @@
+import 'package:flutter/material.dart';
+
 import 'package:cloud_firestore/cloud_firestore.dart';
 
 class Recipe {
@@ -8,6 +10,7 @@ class Recipe {
   final String householdId;
   final List<String> mealTypes;
   final DateTime createdAt;
+  final List<String> comments;
 
   Recipe({
     required this.id,
@@ -17,6 +20,7 @@ class Recipe {
     required this.householdId,
     required this.mealTypes,
     required this.createdAt,
+    required this.comments,
   });
 
   factory Recipe.fromFirestore(DocumentSnapshot doc) {
@@ -31,6 +35,7 @@ class Recipe {
       createdAt: (data['createdAt'] is Timestamp)
           ? (data['createdAt'] as Timestamp).toDate()
           : DateTime.now(),
+      comments: List<String>.from(data['comments'] ?? []),
     );
   }
 
@@ -42,6 +47,7 @@ class Recipe {
       'householdId': householdId,
       'mealTypes': mealTypes,
       'createdAt': Timestamp.fromDate(createdAt),
+      'comments': comments,
     };
   }
 }
