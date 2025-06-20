@@ -34,18 +34,65 @@ class HomeScreen extends ConsumerWidget {
                     itemCount: weekPlans.length,
                     itemBuilder: (context, index) {
                       final plan = weekPlans[index];
-                      return Card(
-                        child: ListTile(
-                          title: Text('Semana ${plan.weekNumber} - ${plan.year}'),
-                          subtitle: Text('Días: ${plan.days.length}'),
-                          trailing: const Icon(Icons.arrow_forward_ios),
-                          onTap: () {
-                            Navigator.of(context).push(
-                              MaterialPageRoute(
-                                builder: (context) => WeekPlanScreen(weekPlanId: plan.id!),
-                              ),
-                            );
-                          },
+                      return Dismissible(
+                        key: Key(plan.id!),
+                        direction: DismissDirection.endToStart,
+                        background: Container(
+                          color: Colors.red,
+                          alignment: Alignment.centerRight,
+                          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+                          child: const Icon(Icons.delete, color: Colors.white),
+                        ),
+                        confirmDismiss: (direction) async {
+                          return await showDialog(
+                            context: context,
+                            builder: (context) => AlertDialog(
+                              title: const Text('Eliminar plan de semana'),
+                              content: const Text(
+                                  '¿Estás seguro de que deseas eliminar este plan de semana?'),
+                              actions: [
+                                TextButton(
+                                  onPressed: () => Navigator.of(context).pop(false),
+                                  child: const Text('Cancelar'),
+                                ),
+                                TextButton(
+                                  onPressed: () => Navigator.of(context).pop(true),
+                                  child: const Text('Eliminar'),
+                                ),
+                              ],
+                            ),
+                          );
+                        },
+                        onDismissed: (direction) async {
+                          await ref.read(firestoreServiceProvider).deleteWeekPlan(plan.id!);
+                          ref.invalidate(weekPlansProvider);
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(content: Text('Plan de semana eliminado')),
+                          );
+                        },
+                        child: Card(
+                          child: ListTile(
+                            title: Text('Menú ${index + 1}'),
+                            subtitle: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text('Días: ${plan.days.length}'),
+                                if (plan.days.isNotEmpty)
+                                  Text(
+                                    plan.days.first.meals.keys.join(', '),
+                                    style: TextStyle(fontSize: 13, color: Colors.grey[700]),
+                                  ),
+                              ],
+                            ),
+                            trailing: const Icon(Icons.arrow_forward_ios),
+                            onTap: () {
+                              Navigator.of(context).push(
+                                MaterialPageRoute(
+                                  builder: (context) => WeekPlanScreen(weekPlanId: plan.id!),
+                                ),
+                              );
+                            },
+                          ),
                         ),
                       );
                     },

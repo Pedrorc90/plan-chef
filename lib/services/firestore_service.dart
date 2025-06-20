@@ -47,6 +47,11 @@ class FirestoreService {
     await _db.collection('weekPlans').doc(weekPlanId).update(weekPlan.toJson());
   }
 
+  // Delete a week plan by ID
+  Future<void> deleteWeekPlan(String weekPlanId) async {
+    await _db.collection('weekPlans').doc(weekPlanId).delete();
+  }
+
   // Get a single week plan by ID
   Future<WeekPlan?> getWeekPlanById(String weekPlanId) async {
     final doc = await _db.collection('weekPlans').doc(weekPlanId).get();

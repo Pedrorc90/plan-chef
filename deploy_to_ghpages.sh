@@ -9,5 +9,5 @@ cp -r build/web/* docs/
 
 # Add, commit, and push changes
 git add docs
-git commit -m "Add web build"
+git commit -m "New deployment to GitHub Pages"
 git push
