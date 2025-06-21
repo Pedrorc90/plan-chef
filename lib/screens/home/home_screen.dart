@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:intl/intl.dart';
 
 import 'package:plan_chef/models/day_plan.dart';
 import 'package:plan_chef/models/week_plan.dart';
@@ -38,7 +39,10 @@ class HomeScreen extends ConsumerWidget {
                         key: Key(plan.id!),
                         direction: DismissDirection.endToStart,
                         background: Container(
-                          color: Colors.red,
+                          decoration: BoxDecoration(
+                            color: Colors.red,
+                            borderRadius: BorderRadius.circular(12), // Match Card's border radius
+                          ),
                           alignment: Alignment.centerRight,
                           padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
                           child: const Icon(Icons.delete, color: Colors.white),
@@ -72,11 +76,16 @@ class HomeScreen extends ConsumerWidget {
                         },
                         child: Card(
                           child: ListTile(
-                            title: Text('Menú ${index + 1}'),
+                            title: Text('Menú desde '
+                                '${plan.startDate} '
+                                '${_formatDate(plan.createdAt, plan.startDate, plan.days.length)}'
+                                ' hasta '
+                                '${plan.endDate} '
+                                '${_formatDate(plan.createdAt, plan.endDate, plan.days.length, isEnd: true)}'),
                             subtitle: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                Text('Días: ${plan.days.length}'),
+                                //Text('Días: ${plan.days.length}'),
                                 if (plan.days.isNotEmpty)
                                   Text(
                                     plan.days.first.meals.keys.join(', '),
@@ -117,16 +126,22 @@ class HomeScreen extends ConsumerWidget {
                     initialDays: selectedDays,
                     initialMeals: selectedMeals,
                     mealOptions: mealOptions,
+                    // New fields for start/end date
+                    initialStartDate: 'Lunes',
+                    initialEndDate: 'Domingo',
                   ),
                 );
                 if (result == null) return;
                 final selectedNumDays = result['days'] as int;
                 final selectedMealTypes = List<String>.from(result['meals'] as List);
+                final startDate = result['startDate'] as String? ?? 'Lunes';
+                final endDate = result['endDate'] as String? ?? 'Domingo';
+                final numDays = _daysBetweenWeekdays(startDate, endDate);
                 final now = DateTime.now();
                 final weekNumber = _getWeekNumber(now);
                 final year = now.year;
                 final days = List.generate(
-                  selectedNumDays,
+                  numDays,
                   (i) => DayPlan(id: i.toString(), meals: {for (var m in selectedMealTypes) m: ''}),
                 );
                 final newPlan = WeekPlan(
@@ -137,6 +152,8 @@ class HomeScreen extends ConsumerWidget {
                   year: year,
                   days: days,
                   createdAt: now,
+                  startDate: startDate,
+                  endDate: endDate,
                 );
                 await ref.read(firestoreServiceProvider).createWeekPlan(newPlan);
                 ref.invalidate(weekPlansProvider);
@@ -152,5 +169,46 @@ class HomeScreen extends ConsumerWidget {
     final firstDayOfYear = DateTime(thursday.year, 1, 1);
     final daysDifference = thursday.difference(firstDayOfYear).inDays;
     return 1 + (daysDifference / 7).floor();
+  }
+
+  String _formatDate(DateTime createdAt, String dayName, int numDays, {bool isEnd = false}) {
+    // Map day names to weekday numbers (Monday=1, ..., Sunday=7)
+    const dayMap = {
+      'Lunes': 1,
+      'Martes': 2,
+      'Miércoles': 3,
+      'Jueves': 4,
+      'Viernes': 5,
+      'Sábado': 6,
+      'Domingo': 7,
+    };
+    int startWeekday = dayMap[dayName] ?? 1;
+    // Find the first date in the week that matches the start day
+    DateTime startDate = createdAt;
+    while (startDate.weekday != startWeekday) {
+      startDate = startDate.add(const Duration(days: 1));
+    }
+    if (isEnd) {
+      // End date is start date + numDays - 1
+      startDate = startDate.add(Duration(days: numDays - 1));
+    }
+    return DateFormat('dd/MM').format(startDate);
+  }
+
+  int _daysBetweenWeekdays(String start, String end) {
+    const dayMap = {
+      'Lunes': 1,
+      'Martes': 2,
+      'Miércoles': 3,
+      'Jueves': 4,
+      'Viernes': 5,
+      'Sábado': 6,
+      'Domingo': 7,
+    };
+    int startIdx = dayMap[start] ?? 1;
+    int endIdx = dayMap[end] ?? 1;
+    int diff = endIdx - startIdx;
+    if (diff < 0) diff += 7;
+    return diff + 1;
   }
 }

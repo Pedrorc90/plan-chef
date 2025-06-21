@@ -151,7 +151,10 @@ class RecipesScreen extends ConsumerWidget {
                     key: Key(recipe.id),
                     direction: DismissDirection.endToStart,
                     background: Container(
-                      color: Colors.red,
+                      decoration: BoxDecoration(
+                        color: Colors.red,
+                        borderRadius: BorderRadius.circular(12), // Match Card's border radius
+                      ),
                       alignment: Alignment.centerRight,
                       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
                       child: const Icon(Icons.delete, color: Colors.white),
@@ -263,7 +266,8 @@ class __RecipeCardWithCommentsState extends State<_RecipeCardWithComments> {
                                 runSpacing: 4,
                                 children: [
                                   ...recipe.mealTypes.map((type) => Container(
-                                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                        padding:
+                                            const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                                         decoration: BoxDecoration(
                                           color: _mealTypeColor(type),
                                           borderRadius: BorderRadius.circular(12),

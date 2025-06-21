@@ -10,6 +10,8 @@ class WeekPlan {
   final int year;
   final List<DayPlan> days;
   final DateTime createdAt;
+  final String startDate; // e.g., 'Lunes'
+  final String endDate; // e.g., 'Domingo'
 
   WeekPlan({
     this.id,
@@ -19,6 +21,8 @@ class WeekPlan {
     required this.year,
     required this.days,
     required this.createdAt,
+    required this.startDate,
+    required this.endDate,
   });
 
   factory WeekPlan.fromJson(Map<String, dynamic> json, {String? id}) => WeekPlan(
@@ -31,6 +35,8 @@ class WeekPlan {
             .map((d) => DayPlan.fromJson(d as Map<String, dynamic>))
             .toList(),
         createdAt: (json['createdAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
+        startDate: json['startDate'] ?? 'Lunes',
+        endDate: json['endDate'] ?? 'Domingo',
       );
 
   Map<String, dynamic> toJson() => {
@@ -40,5 +46,7 @@ class WeekPlan {
         'year': year,
         'days': days.map((d) => d.toJson()).toList(),
         'createdAt': Timestamp.fromDate(createdAt),
+        'startDate': startDate,
+        'endDate': endDate,
       };
 }

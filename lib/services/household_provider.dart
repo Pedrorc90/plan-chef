@@ -1,11 +1,6 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import 'package:plan_chef/models/week_plan.dart';
-
 import 'firestore_service.dart';
-import 'household_provider.dart';
 
 /// Provides the current user's householdId (first household found)
 final householdIdProvider = FutureProvider<String?>((ref) async {

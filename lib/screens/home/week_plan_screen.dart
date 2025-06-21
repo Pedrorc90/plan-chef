@@ -98,6 +98,56 @@ class _WeekPlanScreenState extends ConsumerState<WeekPlanScreen> {
               );
             },
           ),
+          IconButton(
+            icon: const Icon(Icons.edit),
+            tooltip: 'Editar plan de semana',
+            onPressed: _weekPlan == null
+                ? null
+                : () async {
+                    // Always allow all meal types for editing
+                    final allMealOptions = ['Desayuno', 'Comida', 'Merienda', 'Cena'];
+                    final currentMeals = _weekPlan!.days.isNotEmpty
+                        ? _weekPlan!.days.first.meals.keys.toSet()
+                        : allMealOptions.toSet();
+                    final result = await showDialog<Map<String, dynamic>>(
+                      context: context,
+                      builder: (context) => WeekPlanCreationDialog(
+                        initialDays: _weekPlan!.days.length,
+                        initialMeals: currentMeals,
+                        mealOptions: allMealOptions,
+                        initialStartDate: _weekPlan!.startDate,
+                        initialEndDate: _weekPlan!.endDate,
+                      ),
+                    );
+                    if (result == null) return;
+                    final selectedNumDays = result['days'] as int;
+                    final selectedMealTypes = List<String>.from(result['meals'] as List);
+                    final startDate = result['startDate'] as String? ?? 'Lunes';
+                    final endDate = result['endDate'] as String? ?? 'Domingo';
+                    setState(() {
+                      _weekPlan = WeekPlan(
+                        id: _weekPlan!.id,
+                        householdId: _weekPlan!.householdId,
+                        createdBy: _weekPlan!.createdBy,
+                        weekNumber: _weekPlan!.weekNumber,
+                        year: _weekPlan!.year,
+                        days: List.generate(
+                          selectedNumDays,
+                          (i) => DayPlan(
+                            id: i.toString(),
+                            meals: {for (var m in selectedMealTypes) m: ''},
+                          ),
+                        ),
+                        createdAt: _weekPlan!.createdAt,
+                        startDate: startDate,
+                        endDate: endDate,
+                      );
+                    });
+                    await ref
+                        .read(firestoreServiceProvider)
+                        .updateWeekPlan(_weekPlan!.id!, _weekPlan!);
+                  },
+          ),
         ],
       ),
       body: _loading
@@ -169,60 +219,6 @@ class _WeekPlanScreenState extends ConsumerState<WeekPlanScreen> {
                       ],
                     ),
     );
-  }
-
-  Future<void> _createNewWeekPlan() async {
-    final user = ref.read(firebaseUserProvider).asData?.value;
-    final householdId = await ref.read(householdIdProvider.future);
-    if (user == null || householdId == null) return;
-
-    // Show modal to select days and meal types
-    int selectedDays = 7;
-    final mealOptions = ['Desayuno', 'Comida', 'Merienda', 'Cena'];
-    final selectedMeals = mealOptions.toSet();
-    final result = await showDialog<Map<String, dynamic>>(
-      context: context,
-      builder: (context) => WeekPlanCreationDialog(
-        initialDays: selectedDays,
-        initialMeals: selectedMeals,
-        mealOptions: mealOptions,
-      ),
-    );
-    if (result == null) return;
-    final selectedNumDays = result['days'] as int;
-    final selectedMealTypes = List<String>.from(result['meals'] as List);
-
-    setState(() {
-      _loading = true;
-      _error = null;
-    });
-    try {
-      final now = DateTime.now();
-      final weekNumber = _getWeekNumber(now);
-      final year = now.year;
-      final days = List.generate(
-        selectedNumDays,
-        (i) => DayPlan(id: i.toString(), meals: {for (var m in selectedMealTypes) m: ''}),
-      );
-      final newPlan = WeekPlan(
-        id: null, // Firestore will assign the ID
-        householdId: householdId, // use real householdId
-        createdBy: user.uid,
-        weekNumber: weekNumber,
-        year: year,
-        days: days,
-        createdAt: now,
-      );
-      await ref.read(firestoreServiceProvider).createWeekPlan(newPlan);
-      await _fetchWeekPlan();
-    } catch (e) {
-      print('Error in _createNewWeekPlan:');
-      print(e);
-      setState(() {
-        _error = e.toString();
-        _loading = false;
-      });
-    }
   }
 
   Future<String?> _selectRecipeDialog(String mealType) async {

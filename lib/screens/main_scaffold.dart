@@ -1,10 +1,8 @@
 import 'package:flutter/material.dart';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:plan_chef/screens/home/home_screen.dart';
-import 'package:plan_chef/screens/home/menu_generator_screen.dart';
 import 'package:plan_chef/screens/home/shopping_list_screen.dart';
 import 'package:plan_chef/screens/profile/profile_screen.dart';
 import 'package:plan_chef/screens/recipes/recipes_screen.dart';
@@ -33,21 +31,21 @@ class _MainScaffoldState extends ConsumerState<MainScaffold> {
       child: Scaffold(
         appBar: AppBar(
           centerTitle: true,
-          title: Row(
+          title: const Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              const Icon(Icons.restaurant_menu),
-              const SizedBox(width: 8),
-              const Text('Plan '),
-              const Text('Chef'),
-              const SizedBox(width: 8),
-              const Icon(Icons.eco),
+              Icon(Icons.restaurant_menu),
+              SizedBox(width: 8),
+              Text('Plan '),
+              Text('Chef'),
+              SizedBox(width: 8),
+              Icon(Icons.eco),
             ],
           ),
-          actions: [], // Removed the logout button from the AppBar actions
+          actions: const [], // Removed the logout button from the AppBar actions
         ),
         body: [
-          HomeScreen(),
+          const HomeScreen(),
           const RecipesScreen(),
           //const MenuGeneratorScreen(),
           const ShoppingListScreen(),
