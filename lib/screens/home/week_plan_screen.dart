@@ -53,6 +53,8 @@ class _WeekPlanScreenState extends ConsumerState<WeekPlanScreen> {
 
   @override
   Widget build(BuildContext context) {
+    // Define weekDays for use in the widget
+    final weekDays = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo'];
     return Scaffold(
       appBar: AppBar(
         title: const Text('Detalle de Semana'),
@@ -104,15 +106,22 @@ class _WeekPlanScreenState extends ConsumerState<WeekPlanScreen> {
             onPressed: _weekPlan == null
                 ? null
                 : () async {
-                    // Always allow all meal types for editing
                     final allMealOptions = ['Desayuno', 'Comida', 'Merienda', 'Cena'];
                     final currentMeals = _weekPlan!.days.isNotEmpty
                         ? _weekPlan!.days.first.meals.keys.toSet()
                         : allMealOptions.toSet();
+                    final weekDays = [
+                      'Lunes',
+                      'Martes',
+                      'Miércoles',
+                      'Jueves',
+                      'Viernes',
+                      'Sábado',
+                      'Domingo'
+                    ];
                     final result = await showDialog<Map<String, dynamic>>(
                       context: context,
                       builder: (context) => WeekPlanCreationDialog(
-                        initialDays: _weekPlan!.days.length,
                         initialMeals: currentMeals,
                         mealOptions: allMealOptions,
                         initialStartDate: _weekPlan!.startDate,
@@ -120,10 +129,40 @@ class _WeekPlanScreenState extends ConsumerState<WeekPlanScreen> {
                       ),
                     );
                     if (result == null) return;
-                    final selectedNumDays = result['days'] as int;
                     final selectedMealTypes = List<String>.from(result['meals'] as List);
                     final startDate = result['startDate'] as String? ?? 'Lunes';
                     final endDate = result['endDate'] as String? ?? 'Domingo';
+                    int startIdx = weekDays.indexOf(startDate);
+                    int endIdx = weekDays.indexOf(endDate);
+                    int numDays = startIdx <= endIdx
+                        ? endIdx - startIdx + 1
+                        : (weekDays.length - startIdx) + endIdx + 1;
+                    // Build new days list, preserving meal assignments where possible
+                    final oldDaysByWeekday = {
+                      for (var d in _weekPlan!.days) weekDays[int.tryParse(d.id) ?? 0]: d
+                    };
+                    final newDaysList = List.generate(numDays, (i) {
+                      int dayIdx = (startIdx + i) % weekDays.length;
+                      String weekday = weekDays[dayIdx];
+                      final oldDay = oldDaysByWeekday[weekday];
+                      // If oldDay exists, preserve meal assignments for matching meal types
+                      if (oldDay != null) {
+                        final preservedMeals = <String, String>{};
+                        for (var meal in selectedMealTypes) {
+                          if (oldDay.meals.containsKey(meal)) {
+                            preservedMeals[meal] = oldDay.meals[meal]!;
+                          } else {
+                            preservedMeals[meal] = '';
+                          }
+                        }
+                        return oldDay.copyWith(meals: preservedMeals);
+                      } else {
+                        return DayPlan(
+                          id: dayIdx.toString(),
+                          meals: {for (var m in selectedMealTypes) m: ''},
+                        );
+                      }
+                    });
                     setState(() {
                       _weekPlan = WeekPlan(
                         id: _weekPlan!.id,
@@ -131,13 +170,7 @@ class _WeekPlanScreenState extends ConsumerState<WeekPlanScreen> {
                         createdBy: _weekPlan!.createdBy,
                         weekNumber: _weekPlan!.weekNumber,
                         year: _weekPlan!.year,
-                        days: List.generate(
-                          selectedNumDays,
-                          (i) => DayPlan(
-                            id: i.toString(),
-                            meals: {for (var m in selectedMealTypes) m: ''},
-                          ),
-                        ),
+                        days: newDaysList,
                         createdAt: _weekPlan!.createdAt,
                         startDate: startDate,
                         endDate: endDate,
@@ -166,50 +199,89 @@ class _WeekPlanScreenState extends ConsumerState<WeekPlanScreen> {
                               return Card(
                                 margin: const EdgeInsets.all(8),
                                 child: ExpansionTile(
-                                  title: Text('Día ${dayIdx + 1}'),
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(12),
+                                    side: BorderSide.none,
+                                  ),
+                                  collapsedShape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(12),
+                                    side: BorderSide.none,
+                                  ),
+                                  // Show the actual day of the week instead of 'Día 1'
+                                  title: Text(weekDays[
+                                      (weekDays.indexOf(_weekPlan!.startDate) + dayIdx) %
+                                          weekDays.length]),
                                   initiallyExpanded: true,
                                   children: [
-                                    ...day.meals.keys.map((mealType) {
+                                    ...['Desayuno', 'Comida', 'Merienda', 'Cena']
+                                        .where((mealType) => day.meals.containsKey(mealType))
+                                        .map((mealType) {
                                       final recipeId = day.meals[mealType] ?? '';
-                                      return ListTile(
-                                        title: Text(mealType),
-                                        subtitle: FutureBuilder<Recipe?>(
-                                          future: recipeId.isNotEmpty
-                                              ? _fetchRecipe(recipeId)
-                                              : Future.value(null),
-                                          builder: (context, snapshot) {
-                                            if (recipeId.isEmpty) {
-                                              return const Text('Sin asignar');
-                                            }
-                                            if (snapshot.connectionState ==
-                                                ConnectionState.waiting) {
-                                              return const Text('Cargando...');
-                                            }
-                                            if (!snapshot.hasData || snapshot.data == null) {
-                                              return const Text('Receta no encontrada');
-                                            }
-                                            final recipe = snapshot.data!;
-                                            final title = recipe.title;
-                                            return Text('Receta: $title');
-                                          },
-                                        ),
-                                        trailing: IconButton(
-                                          icon: const Icon(Icons.edit),
-                                          onPressed: () async {
-                                            final selectedRecipeId =
-                                                await _selectRecipeDialog(mealType);
-                                            if (selectedRecipeId != null) {
-                                              setState(() {
-                                                day.meals[mealType] = selectedRecipeId;
-                                              });
-                                              await ref
-                                                  .read(firestoreServiceProvider)
-                                                  .updateWeekPlan(_weekPlan!.id!, _weekPlan!);
-                                            }
-                                          },
-                                        ),
+                                      return FutureBuilder<Recipe?>(
+                                        future: recipeId.isNotEmpty
+                                            ? _fetchRecipe(recipeId)
+                                            : Future.value(null),
+                                        builder: (context, snapshot) {
+                                          String recipeTitle = '';
+                                          if (recipeId.isEmpty) {
+                                            recipeTitle = 'Sin asignar';
+                                          } else if (snapshot.connectionState ==
+                                              ConnectionState.waiting) {
+                                            recipeTitle = 'Cargando...';
+                                          } else if (!snapshot.hasData || snapshot.data == null) {
+                                            recipeTitle = 'Receta no encontrada';
+                                          } else {
+                                            recipeTitle = snapshot.data!.title;
+                                          }
+                                          return Container(
+                                            margin: const EdgeInsets.symmetric(
+                                                vertical: 8, horizontal: 12),
+                                            decoration: BoxDecoration(
+                                              borderRadius: BorderRadius.circular(12),
+                                              boxShadow: [
+                                                BoxShadow(
+                                                  color: Colors.lightGreen.withOpacity(0.08),
+                                                  blurRadius: 6,
+                                                  offset: const Offset(0, 2),
+                                                ),
+                                              ],
+                                              border: Border.all(color: Colors.lightGreen.shade100),
+                                            ),
+                                            child: ListTile(
+                                              contentPadding: const EdgeInsets.symmetric(
+                                                  horizontal: 16, vertical: 8),
+                                              leading: Icon(Icons.restaurant_menu,
+                                                  color: Colors.lightGreen.shade300),
+                                              title: Text('$mealType: $recipeTitle',
+                                                  style:
+                                                      const TextStyle(fontWeight: FontWeight.bold)),
+                                              subtitle: recipeId.isNotEmpty &&
+                                                      snapshot.hasData &&
+                                                      snapshot.data != null
+                                                  ? Text(snapshot.data!.ingredients.join(', '),
+                                                      style: const TextStyle(fontSize: 13))
+                                                  : null,
+                                              trailing: IconButton(
+                                                icon: const Icon(Icons.edit,
+                                                    color: Colors.lightGreen),
+                                                onPressed: () async {
+                                                  final selectedRecipeId =
+                                                      await _selectRecipeDialog(mealType);
+                                                  if (selectedRecipeId != null) {
+                                                    setState(() {
+                                                      day.meals[mealType] = selectedRecipeId;
+                                                    });
+                                                    await ref
+                                                        .read(firestoreServiceProvider)
+                                                        .updateWeekPlan(_weekPlan!.id!, _weekPlan!);
+                                                  }
+                                                },
+                                              ),
+                                            ),
+                                          );
+                                        },
                                       );
-                                    }).toList(),
+                                    }),
                                   ],
                                 ),
                               );
@@ -290,13 +362,5 @@ class _WeekPlanScreenState extends ConsumerState<WeekPlanScreen> {
     final doc = await FirebaseFirestore.instance.collection('recipes').doc(recipeId).get();
     if (!doc.exists) return null;
     return Recipe.fromFirestore(doc);
-  }
-
-  int _getWeekNumber(DateTime date) {
-    // ISO 8601 week number calculation
-    final thursday = date.add(Duration(days: 4 - (date.weekday == 7 ? 0 : date.weekday)));
-    final firstDayOfYear = DateTime(thursday.year, 1, 1);
-    final daysDifference = thursday.difference(firstDayOfYear).inDays;
-    return 1 + (daysDifference / 7).floor();
   }
 }

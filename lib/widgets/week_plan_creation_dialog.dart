@@ -53,24 +53,6 @@ class _WeekPlanCreationDialogState extends State<WeekPlanCreationDialog> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Text('¿Cuántos días?'),
-            Row(
-              children: [
-                Radio<int>(
-                  value: 5,
-                  groupValue: tempDays,
-                  onChanged: (v) => setState(() => tempDays = v ?? 7),
-                ),
-                const Text('5 días'),
-                Radio<int>(
-                  value: 7,
-                  groupValue: tempDays,
-                  onChanged: (v) => setState(() => tempDays = v ?? 7),
-                ),
-                const Text('7 días'),
-              ],
-            ),
-            const SizedBox(height: 12),
             const Text('¿Qué comidas?'),
             ...widget.mealOptions.map((meal) => CheckboxListTile(
                   title: Text(meal),
@@ -112,6 +94,17 @@ class _WeekPlanCreationDialogState extends State<WeekPlanCreationDialog> {
                 ),
               ],
             ),
+            const SizedBox(height: 12),
+            Builder(
+              builder: (context) {
+                int startIdx = weekDays.indexOf(tempStartDate);
+                int endIdx = weekDays.indexOf(tempEndDate);
+                int numDays = startIdx <= endIdx
+                    ? endIdx - startIdx + 1
+                    : (weekDays.length - startIdx) + endIdx + 1;
+                return Text('Días seleccionados: $numDays');
+              },
+            ),
           ],
         ),
       ),
@@ -123,8 +116,13 @@ class _WeekPlanCreationDialogState extends State<WeekPlanCreationDialog> {
         ElevatedButton(
           onPressed: () {
             if (tempMeals.isEmpty) return;
+            int startIdx = weekDays.indexOf(tempStartDate);
+            int endIdx = weekDays.indexOf(tempEndDate);
+            int numDays = startIdx <= endIdx
+                ? endIdx - startIdx + 1
+                : (weekDays.length - startIdx) + endIdx + 1;
             Navigator.of(context).pop({
-              'days': tempDays,
+              'days': numDays,
               'meals': tempMeals.toList(),
               'startDate': tempStartDate,
               'endDate': tempEndDate,

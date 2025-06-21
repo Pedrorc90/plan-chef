@@ -14,4 +14,11 @@ class DayPlan {
         'id': id,
         'meals': meals,
       };
+
+  DayPlan copyWith({String? id, Map<String, String>? meals}) {
+    return DayPlan(
+      id: id ?? this.id,
+      meals: meals ?? this.meals,
+    );
+  }
 }
