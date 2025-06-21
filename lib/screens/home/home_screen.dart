@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 
@@ -7,7 +8,11 @@ import 'package:plan_chef/models/day_plan.dart';
 import 'package:plan_chef/models/week_plan.dart';
 import 'package:plan_chef/widgets/week_plan_creation_dialog.dart';
 
+import '../../models/recipe.dart';
+import '../../models/recipe.dart';
 import '../../services/firestore_service.dart';
+import '../../services/firestore_service.dart';
+import '../../services/household_provider.dart';
 import '../../services/household_provider.dart';
 
 import 'week_plan_screen.dart';
@@ -68,11 +73,15 @@ class HomeScreen extends ConsumerWidget {
                           );
                         },
                         onDismissed: (direction) async {
-                          await ref.read(firestoreServiceProvider).deleteWeekPlan(plan.id!);
+                          final planId = plan.id;
+                          if (planId == null) return;
+                          await ref.read(firestoreServiceProvider).deleteWeekPlan(planId);
                           ref.invalidate(weekPlansProvider);
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(content: Text('Plan de semana eliminado')),
-                          );
+                          if (context.mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(content: Text('Plan de semana eliminado')),
+                            );
+                          }
                         },
                         child: Card(
                           child: ListTile(

@@ -305,6 +305,10 @@ class _WeekPlanScreenState extends ConsumerState<WeekPlanScreen> {
         .map((doc) => Recipe.fromFirestore(doc))
         .where((r) => r.mealTypes.contains(mealType))
         .toList();
+    // Get all recipe IDs already used in the current week plan
+    final usedRecipeIds =
+        _weekPlan?.days.expand((d) => d.meals.values).where((id) => id.isNotEmpty).toSet() ??
+            <String>{};
     String? selectedRecipeId;
     return showDialog<String>(
       context: context,
@@ -320,29 +324,38 @@ class _WeekPlanScreenState extends ConsumerState<WeekPlanScreen> {
                     itemCount: recipes.length,
                     itemBuilder: (context, idx) {
                       final recipe = recipes[idx];
-                      return Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Padding(
-                            padding: const EdgeInsets.only(left: 8, right: 8, top: 8, bottom: 2),
-                            child: Text(
-                              recipe.mealTypes.join(', '),
-                              style: const TextStyle(
-                                fontWeight: FontWeight.bold,
-                                color: Colors.green,
+                      final isUsed = usedRecipeIds.contains(recipe.id);
+                      return Opacity(
+                        opacity: isUsed ? 0.4 : 1.0,
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Padding(
+                              padding: const EdgeInsets.only(left: 8, right: 8, top: 8, bottom: 2),
+                              child: Text(
+                                recipe.mealTypes.join(', '),
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.green,
+                                ),
                               ),
                             ),
-                          ),
-                          RadioListTile<String>(
-                            title: Text(recipe.title),
-                            value: recipe.id,
-                            groupValue: selectedRecipeId,
-                            onChanged: (val) {
-                              selectedRecipeId = val;
-                              Navigator.of(context).pop(val);
-                            },
-                          ),
-                        ],
+                            RadioListTile<String>(
+                              title: Text(recipe.title,
+                                  style: isUsed
+                                      ? const TextStyle(decoration: TextDecoration.lineThrough)
+                                      : null),
+                              value: recipe.id,
+                              groupValue: selectedRecipeId,
+                              onChanged: isUsed
+                                  ? null
+                                  : (val) {
+                                      selectedRecipeId = val;
+                                      Navigator.of(context).pop(val);
+                                    },
+                            ),
+                          ],
+                        ),
                       );
                     },
                   ),

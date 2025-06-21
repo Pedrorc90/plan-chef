@@ -122,76 +122,138 @@ class RecipesScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final user = ref.watch(firebaseUserProvider).asData?.value;
     final householdIdAsync = ref.watch(householdIdProvider);
+    final mealTypes = ['Desayuno', 'Comida', 'Merienda', 'Cena'];
+    final filterNotifier = ValueNotifier<String?>(null);
     return Scaffold(
       body: householdIdAsync.when(
         data: (householdId) {
           if (householdId == null) {
             return const Center(child: Text('No tienes un hogar vinculado.'));
           }
-          return StreamBuilder<QuerySnapshot>(
-            stream: FirebaseFirestore.instance
-                .collection('recipes')
-                .where('householdId', isEqualTo: householdId)
-                .orderBy('createdAt', descending: true)
-                .snapshots(),
-            builder: (context, snapshot) {
-              if (snapshot.connectionState == ConnectionState.waiting) {
-                return const Center(child: CircularProgressIndicator());
-              }
-              if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
-                return const Center(child: Text('No hay recetas aún.'));
-              }
-              final recipes = snapshot.data!.docs.map((doc) => Recipe.fromFirestore(doc)).toList();
-              return ListView.builder(
-                padding: const EdgeInsets.all(16),
-                itemCount: recipes.length,
-                itemBuilder: (context, index) {
-                  final recipe = recipes[index];
-                  return Dismissible(
-                    key: Key(recipe.id),
-                    direction: DismissDirection.endToStart,
-                    background: Container(
-                      decoration: BoxDecoration(
-                        color: Colors.red,
-                        borderRadius: BorderRadius.circular(12), // Match Card's border radius
+          return ValueListenableBuilder<String?>(
+            valueListenable: filterNotifier,
+            builder: (context, selectedType, _) {
+              return Column(
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+                    child: SingleChildScrollView(
+                      scrollDirection: Axis.horizontal,
+                      child: Row(
+                        children: [
+                          const Text(''),
+                          ...mealTypes.map((type) => Padding(
+                                padding: const EdgeInsets.symmetric(horizontal: 2),
+                                child: ChoiceChip(
+                                  label: Text(type),
+                                  selected: selectedType == type,
+                                  onSelected: (selected) {
+                                    filterNotifier.value = selected ? type : null;
+                                  },
+                                  selectedColor: _chipColor(type),
+                                  backgroundColor: Colors.grey.shade200,
+                                  labelStyle: TextStyle(
+                                      color: selectedType == type ? Colors.white : Colors.black87,
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 9),
+                                ),
+                              )),
+                          Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 2),
+                            child: ChoiceChip(
+                              label: const Text('X'),
+                              selected: selectedType == null,
+                              onSelected: (selected) {
+                                filterNotifier.value = null;
+                              },
+                              selectedColor: Colors.indigo,
+                              backgroundColor: Colors.grey.shade200,
+                              labelStyle: TextStyle(
+                                  color: selectedType == null ? Colors.white : Colors.indigo,
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 9),
+                            ),
+                          ),
+                        ],
                       ),
-                      alignment: Alignment.centerRight,
-                      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-                      child: const Icon(Icons.delete, color: Colors.white),
                     ),
-                    confirmDismiss: (direction) async {
-                      return await showDialog(
-                        context: context,
-                        builder: (context) => AlertDialog(
-                          title: const Text('Eliminar receta'),
-                          content: const Text('¿Estás seguro de que deseas eliminar esta receta?'),
-                          actions: [
-                            TextButton(
-                              onPressed: () => Navigator.of(context).pop(false),
-                              child: const Text('Cancelar'),
-                            ),
-                            TextButton(
-                              onPressed: () => Navigator.of(context).pop(true),
-                              child: const Text('Eliminar'),
-                            ),
-                          ],
-                        ),
-                      );
-                    },
-                    onDismissed: (direction) async {
-                      await FirebaseFirestore.instance
+                  ),
+                  Expanded(
+                    child: StreamBuilder<QuerySnapshot>(
+                      stream: FirebaseFirestore.instance
                           .collection('recipes')
-                          .doc(recipe.id)
-                          .delete();
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('Receta eliminada')),
-                      );
-                    },
-                    child: _RecipeCardWithComments(
-                        recipe: recipe,
-                        onEdit: () => _showRecipeDialog(context, ref, recipe: recipe)),
-                  );
-                },
+                          .where('householdId', isEqualTo: householdId)
+                          .orderBy('createdAt', descending: true)
+                          .snapshots(),
+                      builder: (context, snapshot) {
+                        if (snapshot.connectionState == ConnectionState.waiting) {
+                          return const Center(child: CircularProgressIndicator());
+                        }
+                        if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
+                          return const Center(child: Text('No hay recetas aún.'));
+                        }
+                        var recipes =
+                            snapshot.data!.docs.map((doc) => Recipe.fromFirestore(doc)).toList();
+                        if (selectedType != null) {
+                          recipes =
+                              recipes.where((r) => r.mealTypes.contains(selectedType)).toList();
+                        }
+                        return ListView.builder(
+                          padding: const EdgeInsets.all(16),
+                          itemCount: recipes.length,
+                          itemBuilder: (context, index) {
+                            final recipe = recipes[index];
+                            return Dismissible(
+                              key: Key(recipe.id),
+                              direction: DismissDirection.endToStart,
+                              background: Container(
+                                decoration: BoxDecoration(
+                                  color: Colors.red,
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                                alignment: Alignment.centerRight,
+                                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+                                child: const Icon(Icons.delete, color: Colors.white),
+                              ),
+                              confirmDismiss: (direction) async {
+                                return await showDialog(
+                                  context: context,
+                                  builder: (context) => AlertDialog(
+                                    title: const Text('Eliminar receta'),
+                                    content: const Text(
+                                        '¿Estás seguro de que deseas eliminar esta receta?'),
+                                    actions: [
+                                      TextButton(
+                                        onPressed: () => Navigator.of(context).pop(false),
+                                        child: const Text('Cancelar'),
+                                      ),
+                                      TextButton(
+                                        onPressed: () => Navigator.of(context).pop(true),
+                                        child: const Text('Eliminar'),
+                                      ),
+                                    ],
+                                  ),
+                                );
+                              },
+                              onDismissed: (direction) async {
+                                await FirebaseFirestore.instance
+                                    .collection('recipes')
+                                    .doc(recipe.id)
+                                    .delete();
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(content: Text('Receta eliminada')),
+                                );
+                              },
+                              child: _RecipeCardWithComments(
+                                  recipe: recipe,
+                                  onEdit: () => _showRecipeDialog(context, ref, recipe: recipe)),
+                            );
+                          },
+                        );
+                      },
+                    ),
+                  ),
+                ],
               );
             },
           );
@@ -207,6 +269,21 @@ class RecipesScreen extends ConsumerWidget {
               child: const Icon(Icons.add),
             ),
     );
+  }
+
+  Color _chipColor(String mealType) {
+    switch (mealType) {
+      case 'Desayuno':
+        return Colors.orange.shade400;
+      case 'Comida':
+        return Colors.green.shade400;
+      case 'Merienda':
+        return Colors.blue.shade400;
+      case 'Cena':
+        return Colors.purple.shade400;
+      default:
+        return Colors.grey.shade400;
+    }
   }
 }
 
